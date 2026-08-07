@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Delete Your Account — LaundryBrew</title>
+<style>
+  :root {
+    --primary: #2453FF;
+    --text: #1A1F36;
+    --muted: #667085;
+    --bg: #F7F8FC;
+    --card: #FFFFFF;
+    --border: #E4E9F5;
+    --danger: #D92D20;
+    --danger-bg: #FEF3F2;
+    --keep-bg: #F0F4FF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+  header {
+    margin-bottom: 32px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0 0 10px;
+  }
+  .contact {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .contact a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .contact a:hover { text-decoration: underline; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 36px;
+  }
+  section {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section:last-child { border-bottom: none; padding-bottom: 0; }
+  section:first-of-type { padding-top: 0; }
+  h2 {
+    font-size: 17px;
+    font-weight: 800;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  p { margin: 0 0 8px; font-size: 15px; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { font-size: 15px; margin: 4px 0; }
+  ol { margin: 8px 0; padding-left: 20px; }
+  ol li { font-size: 15px; margin: 6px 0; }
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  @media (max-width: 560px) {
+    .cols { grid-template-columns: 1fr; }
+  }
+  .box {
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .box h3 {
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0 0 8px;
+  }
+  .box.remove { background: var(--danger-bg); }
+  .box.remove h3 { color: var(--danger); }
+  .box.keep { background: var(--keep-bg); }
+  .box.keep h3 { color: var(--primary); }
+  .box ul { margin: 0; padding-left: 18px; }
+  .box li { font-size: 14px; margin: 3px 0; }
+  .retention {
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    background: var(--keep-bg);
+    padding: 8px 14px;
+    border-radius: 8px;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 32px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #EDEFF7;
+      --muted: #9AA3B8;
+      --bg: #0F1220;
+      --card: #171B2E;
+      --border: #2A2F45;
+      --danger-bg: #2A1616;
+      --keep-bg: #16203A;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Delete Your LaundryBrew Account</h1>
+      <div class="contact">
+        LaundryBrew &nbsp;|&nbsp;
+        <a href="mailto:support@laundrybrew.com">support@laundrybrew.com</a> &nbsp;|&nbsp;
+        <a href="tel:+919620043739">9620043739</a>
+      </div>
+    </header>
+
+    <div class="card">
+      <section>
+        <h2>How to request account deletion</h2>
+        <p>Account deletion is self-service and happens inside the LaundryBrew app. To delete your account:</p>
+        <ol>
+          <li>Open the <strong>LaundryBrew</strong> app and sign in.</li>
+          <li>Go to <strong>Profile → Privacy &amp; Security → Delete Account</strong>.</li>
+          <li>Review what will be deleted and what will be retained, then confirm.</li>
+          <li>Verify your identity (password, OTP, or your Google/Apple sign-in) to prevent unauthorized deletion.</li>
+          <li>Confirm one final time. Your account is deleted and you're signed out of every device automatically.</li>
+        </ol>
+        <p>Don't have access to the app, or need help? Email <a href="mailto:support@laundrybrew.com">support@laundrybrew.com</a> from your registered email or phone number and we'll process the deletion for you.</p>
+      </section>
+
+      <section>
+        <h2>What gets deleted vs. retained</h2>
+        <p>When your deletion request is confirmed, we immediately deactivate and sign you out of your account. Personal data is permanently deleted or anonymised; a small set of records is kept only where the law requires it.</p>
+        <div class="cols">
+          <div class="box remove">
+            <h3>Deleted</h3>
+            <ul>
+              <li>Name, email, phone number</li>
+              <li>Profile photo</li>
+              <li>Saved addresses</li>
+              <li>Saved preferences</li>
+              <li>Notification settings &amp; device tokens</li>
+              <li>Referral information</li>
+              <li>Login sessions (all devices)</li>
+              <li>Wallet balance (if ₹0; otherwise see below)</li>
+            </ul>
+          </div>
+          <div class="box keep">
+            <h3>Retained (legally required)</h3>
+            <ul>
+              <li>Completed order history</li>
+              <li>Payment &amp; transaction records</li>
+              <li>GST invoices</li>
+              <li>Tax records</li>
+              <li>Fraud-prevention &amp; audit logs</li>
+            </ul>
+          </div>
+        </div>
+        <p>Retained records are kept linked to an anonymised account (your name, contact details, and other personal identifiers are removed) — they are never used to identify you again, only to satisfy tax, accounting, and fraud-prevention obligations.</p>
+        <span class="retention">Retention period: up to 30 days after your request, then permanently anonymised. Legally required financial/tax records (orders, invoices, payment records) are kept for the statutory period required under Indian tax law.</span>
+      </section>
+
+      <section>
+        <h2>Non-zero wallet balance</h2>
+        <p>If you have a remaining wallet balance, contact <a href="mailto:support@laundrybrew.com">support@laundrybrew.com</a> before deleting your account to arrange a refund — wallet balances cannot be recovered once the account is deleted.</p>
+      </section>
+
+      <section>
+        <h2>Questions</h2>
+        <p>For anything about this process, write to <a href="mailto:support@laundrybrew.com">support@laundrybrew.com</a>. See our <a href="/privacy-policy">Privacy Policy</a> for more on how we handle your data.</p>
+      </section>
+    </div>
+
+    <footer>&copy; <span id="year"></span> LaundryBrew. All rights reserved.</footer>
+  </div>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
