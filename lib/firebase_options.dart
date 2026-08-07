@@ -57,20 +57,20 @@ class DefaultFirebaseOptions {
     storageBucket: 'laundrybrew-4bf26.firebasestorage.app',
   );
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC6A5DGwpiTvJuK0dYjc4kDMu3XuWVzAjY',
-    appId: '1:720667706724:ios:d569753c5c94be9071a671',
-    messagingSenderId: '720667706724',
-    projectId: 'laundrybrew-4bf26',
-    storageBucket: 'laundrybrew-4bf26.firebasestorage.app',
-    iosBundleId: 'com.example.myApp',
+    apiKey: 'AIzaSyDBtsm7-PxvclBNWuVA_6jTqu0Xw-Jzzuw',
+    appId: '1:1050278943076:ios:3c2ce15e8fc3ab547a8271',
+    messagingSenderId: '1050278943076',
+    projectId: 'laundry-brew',
+    storageBucket: 'laundry-brew.firebasestorage.app',
+    iosBundleId: 'com.laundrybrew.app',
   );
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC6A5DGwpiTvJuK0dYjc4kDMu3XuWVzAjY',
-    appId: '1:720667706724:ios:d569753c5c94be9071a671',
-    messagingSenderId: '720667706724',
-    projectId: 'laundrybrew-4bf26',
-    storageBucket: 'laundrybrew-4bf26.firebasestorage.app',
-    iosBundleId: 'com.example.myApp',
+    apiKey: 'AIzaSyDBtsm7-PxvclBNWuVA_6jTqu0Xw-Jzzuw',
+    appId: '1:1050278943076:ios:3c2ce15e8fc3ab547a8271',
+    messagingSenderId: '1050278943076',
+    projectId: 'laundry-brew',
+    storageBucket: 'laundry-brew.firebasestorage.app',
+    iosBundleId: 'com.laundrybrew.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
