@@ -24,6 +24,14 @@ workflows:
             exit 1
           fi
           /usr/libexec/PlistBuddy -c "Set :GMSApiKey $GOOGLE_MAPS_API_KEY" ios/Runner/Info.plist
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "com.laundrybrew.app" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Set up signing certificate
+        script: |
+          keychain add-certificates
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
