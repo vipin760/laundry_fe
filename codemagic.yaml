@@ -7,8 +7,10 @@ workflows:
       app_store_connect: codemagic
     environment:
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.laundrybrew.app
+        certificates:
+          - laundrybrew_distribution_p12
+        provisioning_profiles:
+          - Laundrybrew App Store
       groups:
         - ios_secrets
       vars:
@@ -24,14 +26,6 @@ workflows:
             exit 1
           fi
           /usr/libexec/PlistBuddy -c "Set :GMSApiKey $GOOGLE_MAPS_API_KEY" ios/Runner/Info.plist
-      - name: Fetch signing files
-        script: |
-          app-store-connect fetch-signing-files "com.laundrybrew.app" \
-            --type IOS_APP_STORE \
-            --create
-      - name: Set up signing certificate
-        script: |
-          keychain add-certificates
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
