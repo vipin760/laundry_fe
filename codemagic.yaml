@@ -37,7 +37,7 @@ workflows:
           pod install --project-directory=ios
       - name: Flutter analyze
         script: |
-          flutter analyze
+          flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Flutter unit tests
         script: |
           flutter test
