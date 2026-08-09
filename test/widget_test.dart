@@ -16,8 +16,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('LaundryBrew'), findsOneWidget);
-    expect(find.text('Welcome Back!'), findsOneWidget);
-    expect(find.text('Sign In'), findsAtLeastNWidgets(1));
+    expect(find.text('Welcome back!'), findsOneWidget);
+    expect(find.text('Send OTP'), findsOneWidget);
   });
 }
