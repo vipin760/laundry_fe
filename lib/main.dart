@@ -49,7 +49,13 @@ void main() async {
 }
 
 class LaundryApp extends ConsumerWidget {
-  const LaundryApp({super.key});
+  const LaundryApp({super.key, this.theme});
+
+  /// Overrides the app's real theme (which pulls Manrope from
+  /// `package:google_fonts`). Only ever supplied by widget tests, which run
+  /// offline and can't fetch fonts — the real app always uses the default,
+  /// i.e. [AppTheme.lightTheme].
+  final ThemeData? theme;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,7 +67,7 @@ class LaundryApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'LaundryBrew',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: theme ?? AppTheme.lightTheme,
       routerConfig: router,
     );
   }

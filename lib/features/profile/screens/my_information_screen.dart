@@ -422,7 +422,7 @@ class _AvatarWidget extends StatelessWidget {
           width: 96,
           height: 96,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _InitialsWidget(initials: initials),
+          errorBuilder: (_, _, _) => _InitialsWidget(initials: initials),
         ),
       );
     } else {

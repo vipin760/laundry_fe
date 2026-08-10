@@ -65,7 +65,7 @@ class _MyReferralsScreenState extends ConsumerState<MyReferralsScreen> {
             : ListView.separated(
                 controller: _scroll,
                 itemCount: history.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, i) =>
                     _HistoryTile(item: history[i]),
               ),
@@ -111,7 +111,7 @@ class _HistoryTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: _statusColor().withOpacity(0.12),
+              color: _statusColor().withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(item.status.label,

@@ -7,7 +7,6 @@ import '../widgets/pricing_widgets.dart';
 
 // Brand colors
 const _kPrimary = Color(0xFF2453FF);
-const _kPrimaryDk = Color(0xFF1A3FD8);
 const _kBg = Color(0xFFF5F6FA);
 const _kTextPrimary = Color(0xFF0A1645);
 const _kTextMuted = Color(0xFF6B7280);

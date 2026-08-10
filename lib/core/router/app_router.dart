@@ -137,221 +137,221 @@ GoRouter _buildRouter(Ref ref) {
       // ── Splash ─────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.splash,
-        builder: (_, __) => const SplashScreen(),
+        builder: (_, _) => const SplashScreen(),
       ),
 
       // ── Authentication ─────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.login,
-        builder: (_, __) => const AuthScreen(),
+        builder: (_, _) => const AuthScreen(),
       ),
       GoRoute(
         path: AppRoutes.otpVerification,
-        builder: (_, __) => const OtpVerificationScreen(),
+        builder: (_, _) => const OtpVerificationScreen(),
       ),
       GoRoute(
         path: AppRoutes.completeProfile,
-        builder: (_, __) => const CompleteProfileScreen(),
+        builder: (_, _) => const CompleteProfileScreen(),
       ),
 
       // ── Home ───────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.home,
-        builder: (_, __) => const HomeScreen(),
+        builder: (_, _) => const HomeScreen(),
       ),
 
       // ── Pickup & Delivery ──────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.pickupDelivery,
-        builder: (_, __) => const PickupDeliveryScreen(),
+        builder: (_, _) => const PickupDeliveryScreen(),
       ),
       GoRoute(
         path: AppRoutes.pickupSlot,
-        builder: (_, __) => const PickupSlotScreen(),
+        builder: (_, _) => const PickupSlotScreen(),
       ),
       GoRoute(
         path: AppRoutes.deliverySlot,
-        builder: (_, __) => const DeliverySlotScreen(),
+        builder: (_, _) => const DeliverySlotScreen(),
       ),
 
       // ── Services ───────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.services,
-        builder: (_, __) => const ServicesScreen(),
+        builder: (_, _) => const ServicesScreen(),
       ),
       GoRoute(
         path: AppRoutes.ironing,
-        builder: (_, __) => const IroningScreen(),
+        builder: (_, _) => const IroningScreen(),
       ),
       GoRoute(
         path: AppRoutes.washFold,
-        builder: (_, __) => const WashFoldScreen(),
+        builder: (_, _) => const WashFoldScreen(),
       ),
       GoRoute(
         path: AppRoutes.washIron,
-        builder: (_, __) => const WashIronScreen(),
+        builder: (_, _) => const WashIronScreen(),
       ),
       GoRoute(
         path: AppRoutes.dryCleaning,
-        builder: (_, __) => const DryCleaningScreen(),
+        builder: (_, _) => const DryCleaningScreen(),
       ),
       GoRoute(
         path: AppRoutes.shoeCleaning,
-        builder: (_, __) => const ShoeCleaningScreen(),
+        builder: (_, _) => const ShoeCleaningScreen(),
       ),
       GoRoute(
         path: AppRoutes.premiumLaundry,
-        builder: (_, __) => const PremiumLaundryScreen(),
+        builder: (_, _) => const PremiumLaundryScreen(),
       ),
 
       // ── Orders ─────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.orders,
-        builder: (_, __) => const OrdersScreen(),
+        builder: (_, _) => const OrdersScreen(),
       ),
       GoRoute(
         path: AppRoutes.orderReview,
-        builder: (_, __) => const OrderReviewScreen(),
+        builder: (_, _) => const OrderReviewScreen(),
       ),
       GoRoute(
         path: AppRoutes.orderSuccess,
-        builder: (_, __) => const OrderSuccessScreen(),
+        builder: (_, _) => const OrderSuccessScreen(),
       ),
 
       // ── Order Tracking ─────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.trackingConfirmed,
-        builder: (_, __) => const OrderConfirmedScreen(),
+        builder: (_, _) => const OrderConfirmedScreen(),
       ),
       GoRoute(
         path: AppRoutes.trackingPickup,
-        builder: (_, __) => const PickupInProgressScreen(),
+        builder: (_, _) => const PickupInProgressScreen(),
       ),
       GoRoute(
         path: AppRoutes.trackingWashing,
-        builder: (_, __) => const WashingScreen(),
+        builder: (_, _) => const WashingScreen(),
       ),
       GoRoute(
         path: AppRoutes.trackingIroning,
-        builder: (_, __) => const IroningTrackingScreen(),
+        builder: (_, _) => const IroningTrackingScreen(),
       ),
       GoRoute(
         path: AppRoutes.trackingDelivered,
-        builder: (_, __) => const DeliveredScreen(),
+        builder: (_, _) => const DeliveredScreen(),
       ),
 
       // ── Pricing ────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.pricing,
-        builder: (_, __) => const PricingScreen(),
+        builder: (_, _) => const PricingScreen(),
       ),
 
       // ── Wallet ─────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.wallet,
-        builder: (_, __) => const WalletScreen(),
+        builder: (_, _) => const WalletScreen(),
       ),
       GoRoute(
         path: AppRoutes.addMoney,
-        builder: (_, __) => const AddMoneyScreen(),
+        builder: (_, _) => const AddMoneyScreen(),
       ),
       GoRoute(
         path: AppRoutes.transactions,
-        builder: (_, __) => const TransactionsScreen(),
+        builder: (_, _) => const TransactionsScreen(),
       ),
 
       // ── Profile ────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.profile,
-        builder: (_, __) => const ProfileScreen(),
+        builder: (_, _) => const ProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.myInformation,
-        builder: (_, __) => const MyInformationScreen(),
+        builder: (_, _) => const MyInformationScreen(),
       ),
       GoRoute(
         path: AppRoutes.addresses,
-        builder: (_, __) => const AddressesScreen(),
+        builder: (_, _) => const AddressesScreen(),
       ),
       GoRoute(
         path: AppRoutes.addAddress,
-        builder: (_, __) => const AddAddressScreen(),
+        builder: (_, _) => const AddAddressScreen(),
       ),
       GoRoute(
         path: AppRoutes.paymentMethods,
-        builder: (_, __) => const PaymentMethodsScreen(),
+        builder: (_, _) => const PaymentMethodsScreen(),
       ),
       GoRoute(
         path: AppRoutes.referEarn,
-        builder: (_, __) => const ReferEarnScreen(),
+        builder: (_, _) => const ReferEarnScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,
-        builder: (_, __) => const NotificationsScreen(),
+        builder: (_, _) => const NotificationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.secureOrders,
-        builder: (_, __) => const SecureOrdersScreen(),
+        builder: (_, _) => const SecureOrdersScreen(),
       ),
 
       // ── Support ────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.support,
-        builder: (_, __) => const SupportScreen(),
+        builder: (_, _) => const SupportScreen(),
       ),
       GoRoute(
         path: AppRoutes.faqs,
-        builder: (_, __) => const FaqsScreen(),
+        builder: (_, _) => const FaqsScreen(),
       ),
       GoRoute(
         path: AppRoutes.howItWorks,
-        builder: (_, __) => const HowItWorksScreen(),
+        builder: (_, _) => const HowItWorksScreen(),
       ),
       GoRoute(
         path: AppRoutes.terms,
-        builder: (_, __) => const TermsScreen(),
+        builder: (_, _) => const TermsScreen(),
       ),
       GoRoute(
         path: AppRoutes.privacy,
-        builder: (_, __) => const PrivacyScreen(),
+        builder: (_, _) => const PrivacyScreen(),
       ),
 
       // ── More ───────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.more,
-        builder: (_, __) => const MoreScreen(),
+        builder: (_, _) => const MoreScreen(),
       ),
       GoRoute(
         path: AppRoutes.about,
-        builder: (_, __) => const AboutScreen(),
+        builder: (_, _) => const AboutScreen(),
       ),
       GoRoute(
         path: AppRoutes.blog,
-        builder: (_, __) => const BlogScreen(),
+        builder: (_, _) => const BlogScreen(),
       ),
       GoRoute(
         path: AppRoutes.careInstructions,
-        builder: (_, __) => const CareInstructionsScreen(),
+        builder: (_, _) => const CareInstructionsScreen(),
       ),
       GoRoute(
         path: AppRoutes.sustainability,
-        builder: (_, __) => const SustainabilityScreen(),
+        builder: (_, _) => const SustainabilityScreen(),
       ),
       GoRoute(
         path: AppRoutes.contact,
-        builder: (_, __) => const ContactScreen(),
+        builder: (_, _) => const ContactScreen(),
       ),
 
       // ── Delivery Partner ───────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.deliveryPartnerHome,
-        builder: (_, __) => const DeliveryPartnerHomeScreen(),
+        builder: (_, _) => const DeliveryPartnerHomeScreen(),
       ),
 
       // ── Dev — remove before production ─────────────────────────────────────
       GoRoute(
         path: AppRoutes.devScreens,
-        builder: (_, __) => const ScreenNavigator(),
+        builder: (_, _) => const ScreenNavigator(),
       ),
     ],
   );
@@ -361,7 +361,7 @@ GoRouter _buildRouter(Ref ref) {
 // refreshListenable fires on every auth state change (login / logout / 401).
 class _AuthChangeNotifier extends ChangeNotifier {
   _AuthChangeNotifier(Ref ref) {
-    _subscription = ref.listen<AuthState>(authProvider, (_, __) {
+    _subscription = ref.listen<AuthState>(authProvider, (_, _) {
       notifyListeners();
     });
   }

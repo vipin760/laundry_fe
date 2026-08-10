@@ -58,14 +58,14 @@ class UserAddress {
   /// Single-line display string.
   String get fullLine {
     return [houseNo, buildingName, street, area, city, state, pincode]
-        .where((s) => s != null && s!.isNotEmpty)
+        .where((s) => s != null && s.isNotEmpty)
         .join(', ');
   }
 
   /// Pre-fills the form's combined address textarea.
   String get addressLine {
     return [houseNo, buildingName, street, area]
-        .where((s) => s != null && s!.isNotEmpty)
+        .where((s) => s != null && s.isNotEmpty)
         .join(', ');
   }
 }

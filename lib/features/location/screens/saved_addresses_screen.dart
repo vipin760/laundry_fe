@@ -55,7 +55,7 @@ class SavedAddressesScreen extends ConsumerWidget {
       ),
       body: asyncAddresses.when(
         loading: () => const _AddressSkeleton(),
-        error: (_, __) => _ErrorState(
+        error: (_, _) => _ErrorState(
           onRetry: () => ref.invalidate(addressesProvider),
         ),
         data: (addresses) => addresses.isEmpty

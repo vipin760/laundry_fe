@@ -156,7 +156,7 @@ class _BalanceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _kBlue.withOpacity(0.35),
+            color: _kBlue.withValues(alpha: 0.35),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -189,7 +189,7 @@ class _BalanceCard extends StatelessWidget {
           Text(
             'Laundry Brew Wallet',
             style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.w400),
           ),
@@ -224,7 +224,7 @@ class _TxnTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 6,
               offset: const Offset(0, 2)),
         ],

@@ -223,7 +223,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
                     const SizedBox(height: 4),
                     Text('Funds added instantly via Razorpay',
                         style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 13)),
                   ],
                 ),
@@ -259,7 +259,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                    color: _kBlue.withOpacity(0.25),
+                                    color: _kBlue.withValues(alpha: 0.25),
                                     blurRadius: 8,
                                     offset: const Offset(0, 3))
                               ]
@@ -357,7 +357,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kBlueDark,
                     disabledBackgroundColor:
-                        _kBlueDark.withOpacity(0.5),
+                        _kBlueDark.withValues(alpha: 0.5),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),

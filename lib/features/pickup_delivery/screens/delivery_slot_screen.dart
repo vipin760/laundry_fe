@@ -62,7 +62,7 @@ class _DeliverySlotScreenState extends ConsumerState<DeliverySlotScreen> {
         Expanded(child: slotsAsync.when(
           loading: () => const Center(
               child: CircularProgressIndicator(color: _kBlue)),
-          error: (_, __) => SlotRetryView(
+          error: (_, _) => SlotRetryView(
               onRetry: () =>
                   ref.invalidate(standardTimeSlotsProvider(_dateKey))),
           data: (result) {

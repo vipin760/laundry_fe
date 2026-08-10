@@ -30,8 +30,8 @@ class AccountDeletionApi {
   }) async {
     final res = await ApiClient.instance.post('/account/delete/verify', data: {
       'method': method.apiValue,
-      if (password != null) 'password': password,
-      if (otp != null) 'otp': otp,
+      'password': ?password,
+      'otp': ?otp,
     });
     return VerifyResult.fromJson(res.data as Map<String, dynamic>);
   }

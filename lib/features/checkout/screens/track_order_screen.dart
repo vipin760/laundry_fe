@@ -716,7 +716,7 @@ class _HeroBanner extends StatelessWidget {
             child: Image.asset(
               asset,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 width: 160,
                 height: 160,
                 decoration: BoxDecoration(
@@ -957,47 +957,6 @@ class _TimelineRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _StepThumbnail extends StatelessWidget {
-  final String asset;
-  final bool isDone;
-  const _StepThumbnail({required this.asset, required this.isDone});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget img = Image.asset(
-      asset,
-      width: 54,
-      height: 54,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        width: 54,
-        height: 54,
-        color: const Color(0xFFEEF2FF),
-        child: Icon(Icons.local_laundry_service_outlined,
-            size: 26, color: isDone ? _kBlue : _kGrey),
-      ),
-    );
-
-    // Greyscale when not yet reached
-    if (!isDone) {
-      img = ColorFiltered(
-        colorFilter: const ColorFilter.matrix([
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0,      0,      0,      1, 0,
-        ]),
-        child: img,
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: img,
     );
   }
 }

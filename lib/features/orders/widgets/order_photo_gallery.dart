@@ -88,7 +88,7 @@ class OrderPhotoGallery extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: photos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, i) => _Thumb(
                 photo: photos[i],
                 accent: accent,
@@ -106,12 +106,12 @@ class OrderPhotoGallery extends StatelessWidget {
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black,
-        pageBuilder: (_, __, ___) => _FullScreenViewer(
+        pageBuilder: (_, _, _) => _FullScreenViewer(
           title: title,
           photos: photos,
           initialIndex: index,
         ),
-        transitionsBuilder: (_, anim, __, child) =>
+        transitionsBuilder: (_, anim, _, child) =>
             FadeTransition(opacity: anim, child: child),
       ),
     );
@@ -159,7 +159,7 @@ class _Thumb extends StatelessWidget {
                           ),
                         ),
                       ),
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   width: 96,
                   height: 96,
                   color: const Color(0xFFF0F2F8),
@@ -275,7 +275,7 @@ class _FullScreenViewerState extends State<_FullScreenViewer> {
                                     child: CircularProgressIndicator(
                                         color: Colors.white54),
                                   ),
-                        errorBuilder: (_, __, ___) => const Icon(
+                        errorBuilder: (_, _, _) => const Icon(
                             Icons.broken_image_outlined,
                             color: Colors.white38,
                             size: 48),

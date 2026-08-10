@@ -90,14 +90,20 @@ class DeleteAccountScreen extends ConsumerWidget {
           // ── Reason selection ───────────────────────────────────────────
           Text('Why are you leaving?', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          ...DeleteReason.values.map(
-            (r) => RadioListTile<DeleteReason>(
-              value: r,
-              groupValue: state.reason,
-              onChanged: (v) => notifier.setReason(v!),
-              title: Text(r.label),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
+          RadioGroup<DeleteReason>(
+            groupValue: state.reason,
+            onChanged: (v) => notifier.setReason(v!),
+            child: Column(
+              children: DeleteReason.values
+                  .map(
+                    (r) => RadioListTile<DeleteReason>(
+                      value: r,
+                      title: Text(r.label),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  )
+                  .toList(),
             ),
           ),
           const SizedBox(height: 8),

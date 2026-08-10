@@ -363,7 +363,7 @@ class _CheckoutAddressScreenState
             ? _buildForm()
             : const Center(
                 child: CircularProgressIndicator(color: _kBlue)),
-        error: (_, __) => _ErrorState(
+        error: (_, _) => _ErrorState(
             onRetry: () => ref.invalidate(addressesProvider)),
         data: (_) {
           switch (_phase) {
@@ -1135,7 +1135,7 @@ class _DefaultToggle extends StatelessWidget {
           ),
           Switch(
             value: value,
-            activeColor: _kBlue,
+            activeThumbColor: _kBlue,
             onChanged: onChanged,
           ),
         ],

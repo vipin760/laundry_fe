@@ -1043,7 +1043,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 trailing: Switch.adaptive(
                   value: _notificationsEnabled,
                   onChanged: _onNotificationToggle,
-                  activeColor: _kPrimary,
+                  activeThumbColor: _kPrimary,
                 ),
                 onTap: null,
               ),
@@ -1151,7 +1151,7 @@ class _ProfileAvatar extends StatelessWidget {
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Center(
+                errorBuilder: (_, _, _) => Center(
                   child: Text(
                     initials,
                     style: TextStyle(
@@ -1317,8 +1317,9 @@ class _PopularServicesSection extends StatelessWidget {
     if (n.contains('fold'))    return Icons.local_laundry_service_rounded;
     if (n.contains('dry'))     return Icons.dry_cleaning_rounded;
     if (n.contains('shoe'))    return Icons.shopping_bag_rounded;
-    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket'))
-                               return Icons.curtains_rounded;
+    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket')) {
+      return Icons.curtains_rounded;
+    }
     if (n.contains('carpet'))  return Icons.cleaning_services_rounded;
     if (n.contains('bag'))     return Icons.shopping_bag_outlined;
     if (n.contains('premium')) return Icons.star_rounded;
@@ -1406,7 +1407,7 @@ class _PopularServicesSection extends StatelessWidget {
                                 ? Image.network(
                                     s.imageUrl!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Icon(
+                                    errorBuilder: (_, _, _) => Icon(
                                         _iconFor(s.name),
                                         color: _kPrimary,
                                         size: 30),
@@ -1579,8 +1580,9 @@ class _AllServicesSectionState extends ConsumerState<_AllServicesSection> {
     if (n.contains('fold'))    return Icons.local_laundry_service_rounded;
     if (n.contains('dry'))     return Icons.dry_cleaning_rounded;
     if (n.contains('shoe'))    return Icons.shopping_bag_rounded;
-    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket'))
-                               return Icons.curtains_rounded;
+    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket')) {
+      return Icons.curtains_rounded;
+    }
     if (n.contains('carpet'))  return Icons.cleaning_services_rounded;
     if (n.contains('bag'))     return Icons.shopping_bag_outlined;
     if (n.contains('premium')) return Icons.star_rounded;
@@ -1650,7 +1652,7 @@ class _AllServicesSectionState extends ConsumerState<_AllServicesSection> {
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             itemCount: itemCount,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               if (index >= services.length) {
                 // Trailing loader chip
@@ -1728,7 +1730,7 @@ class _ServiceChip extends StatelessWidget {
                 ? Image.network(
                     imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (_, _, _) =>
                         Icon(icon, color: _kPrimary, size: 22),
                   )
                 : Icon(icon, color: _kPrimary, size: 22),

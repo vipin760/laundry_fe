@@ -8,7 +8,6 @@ import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/widgets/app_text.dart';
-import '../../../core/models/coupon_model.dart';
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
 import '../../checkout/services/payment_service.dart';
 import '../../checkout/widgets/coupon_input_widget.dart';
@@ -60,7 +59,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   bool _paying  = false;
   String? _payError;
   String? _currentOrderId;
-  CouponDiscount? _appliedCoupon;
   double? _discountedAmount;
 
   @override
@@ -128,7 +126,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
       if (!mounted) return;
       setState(() {
-        _appliedCoupon = null;
         _discountedAmount = null;
       });
     } catch (e) {
@@ -336,16 +333,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       ),
       child: Column(
         children: [
-          _Row('Order', '#${order.displayNumber}', bold: true, valueColor: _kPrimary),
+          _infoRow('Order', '#${order.displayNumber}', bold: true, valueColor: _kPrimary),
           const Divider(height: 24, color: Color(0xFFF0F2F8)),
-          _Row('Placed on', DateFormat('MMM dd, yyyy · hh:mm a').format(order.createdAt)),
+          _infoRow('Placed on', DateFormat('MMM dd, yyyy · hh:mm a').format(order.createdAt)),
           if (order.address != null) ...[
             const Divider(height: 24, color: Color(0xFFF0F2F8)),
-            _Row('Address', order.address!, maxLines: 2),
+            _infoRow('Address', order.address!, maxLines: 2),
           ],
           if (order.pickupDate != null || order.pickupSlot != null) ...[
             const Divider(height: 24, color: Color(0xFFF0F2F8)),
-            _Row('Pickup', [
+            _infoRow('Pickup', [
               if (order.pickupDate != null) DateFormat('MMM dd, yyyy').format(order.pickupDate!),
               if (order.pickupSlot != null) order.pickupSlot!,
             ].join(' · ')),
@@ -1024,7 +1021,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   // ── Row helper ─────────────────────────────────────────────────────────────
 
-  Widget _Row(String label, String value, {
+  Widget _infoRow(String label, String value, {
     bool bold = false,
     Color? valueColor,
     int maxLines = 1,

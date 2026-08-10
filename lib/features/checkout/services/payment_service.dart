@@ -49,8 +49,8 @@ class PaymentService {
   }) async {
     try {
       final response = await _dio.get('/locations/shops', queryParameters: {
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
         'date': date,
       });
       return (response.data as List? ?? [])

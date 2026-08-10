@@ -377,7 +377,7 @@ class _ScheduledView extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(child: CircularProgressIndicator(color: _kBlue)),
             ),
-            error: (_, __) => Padding(
+            error: (_, _) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: _ErrorView(
                 message: 'Schedule not available right now.',
@@ -729,7 +729,7 @@ class _ServiceRow extends ConsumerWidget {
                   ? Image.network(
                       service.imageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _FallbackIcon(
+                      errorBuilder: (_, _, _) => _FallbackIcon(
                         icon: _iconFor(service.name),
                         selected: qty > 0,
                       ),
@@ -901,7 +901,6 @@ class _CartBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     final count = cart.totalItemsCount;
-    final total = cart.totalPrice;
 
     if (count == 0) return const SizedBox.shrink();
 
