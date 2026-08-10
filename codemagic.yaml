@@ -45,7 +45,13 @@ workflows:
         ignore_failure: true
       - name: Flutter build ipa
         script: |
-          BUILD_NUMBER=$(($(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID") + 1))
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          if ! [[ "$LATEST_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Failed to fetch a valid latest TestFlight build number (got: '$LATEST_BUILD_NUMBER')"
+            exit 1
+          fi
+          BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          echo "Using CFBundleVersion (build number): $BUILD_NUMBER"
           flutter build ipa --release \
             --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY \
             --build-name=1.0.0 \
