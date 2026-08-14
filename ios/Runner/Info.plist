@@ -9,6 +9,8 @@
 	<string>LaundryBrew needs your location to set the pickup &amp; delivery address.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>LaundryBrew needs your location to set the pickup &amp; delivery address.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>LaundryBrew needs your location to set the pickup &amp; delivery address.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>LaundryBrew needs camera access to attach order photos and support images.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
