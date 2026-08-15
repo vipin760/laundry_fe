@@ -21,11 +21,15 @@ workflows:
     scripts:
       - name: Set Google Maps iOS key
         script: |
+          # google_maps_flutter isn't wired into any screen yet, so this key is
+          # inert (see Info.plist comment). Only overrides the committed
+          # placeholder when a real key is present in Codemagic's ios_secrets
+          # group — never fails the build over it.
           if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
-            echo "GOOGLE_MAPS_API_KEY is not set in Codemagic group ios_secrets"
-            exit 1
+            echo "GOOGLE_MAPS_API_KEY not set in Codemagic group ios_secrets — keeping placeholder in Info.plist (Maps isn't wired up)."
+          else
+            /usr/libexec/PlistBuddy -c "Set :GMSApiKey $GOOGLE_MAPS_API_KEY" ios/Runner/Info.plist
           fi
-          /usr/libexec/PlistBuddy -c "Set :GMSApiKey $GOOGLE_MAPS_API_KEY" ios/Runner/Info.plist
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles

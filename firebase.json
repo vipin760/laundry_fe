@@ -13,8 +13,8 @@
           "projectId": "laundrybrew-4bf26",
           "configurations": {
             "android": "1:720667706724:android:7fe53e93a20a5c4a71a671",
-            "ios": "1:720667706724:ios:d569753c5c94be9071a671",
-            "macos": "1:720667706724:ios:d569753c5c94be9071a671",
+            "ios": "1:720667706724:ios:e0034bcb272036d671a671",
+            "macos": "1:720667706724:ios:e0034bcb272036d671a671",
             "web": "1:720667706724:web:c7dd5d2fb0f127ff71a671",
             "windows": "1:720667706724:web:c7dd5d2fb0f127ff71a671"
           }

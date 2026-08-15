@@ -20,8 +20,13 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<!-- google_maps_flutter is an unwired dependency (MapPickerScreen is never
+	     navigated to, and GMSServices.provideAPIKey is never called), so this
+	     value is inert — it just needs to be non-empty for CocoaPods/CI. Set
+	     GOOGLE_MAPS_API_KEY in Codemagic's ios_secrets group to override with
+	     a real key if the map picker ever gets wired up. -->
 	<key>GMSApiKey</key>
-	<string>YOUR_GOOGLE_MAPS_API_KEY</string>
+	<string>UNUSED-MAPS-KEY-NOT-WIRED-UP</string>
 	<!-- Export compliance: app only uses HTTPS/TLS (OS-provided) for API
 	     calls and standard encryption from Firebase/Razorpay SDKs for auth
 	     and payments — no proprietary/custom encryption. Declaring this
