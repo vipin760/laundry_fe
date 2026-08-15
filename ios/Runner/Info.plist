@@ -22,6 +22,13 @@
 	</array>
 	<key>GMSApiKey</key>
 	<string>YOUR_GOOGLE_MAPS_API_KEY</string>
+	<!-- Export compliance: app only uses HTTPS/TLS (OS-provided) for API
+	     calls and standard encryption from Firebase/Razorpay SDKs for auth
+	     and payments — no proprietary/custom encryption. Declaring this
+	     lets App Store Connect auto-determine compliance for every build,
+	     instead of requiring a manual answer per upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
