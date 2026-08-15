@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,41 +13,59 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/services/notification_service.dart';
 
-void main() async {
-  // debugPrint() is not stripped in release builds by default — it's a
-  // throttled print wrapper, not a debug-only stub. Silence it here so
-  // internal diagnostics (including things like auth token fragments)
-  // never reach a production console.
-  if (kReleaseMode) {
-    debugPrint = (String? message, {int? wrapWidth}) {};
-  }
+void main() {
+  // Startup init (below) must never be able to leave runApp() uncalled.
+  // An uncaught exception thrown from an async main() before runApp() does
+  // NOT produce a native iOS crash — the process stays alive with nothing
+  // ever drawn, i.e. an indefinite blank screen with zero crash report.
+  // runZonedGuarded + the try/catch below guarantee runApp() always runs.
+  runZonedGuarded(() async {
+    // debugPrint() is not stripped in release builds by default — it's a
+    // throttled print wrapper, not a debug-only stub. Silence it here so
+    // internal diagnostics (including things like auth token fragments)
+    // never reach a production console.
+    if (kReleaseMode) {
+      debugPrint = (String? message, {int? wrapWidth}) {};
+    }
 
-  WidgetsFlutterBinding.ensureInitialized();
-  await ApiClient.init();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Register background message handler for Firebase Messaging
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  
-  // Initialize notification service
-  await NotificationService.instance.initialize();
+    try {
+      await ApiClient.init();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
 
-  // Single top-level container so the 401 interceptor can call forceLogout()
-  // without needing a BuildContext.
-  final container = ProviderContainer();
+      // Register background message handler for Firebase Messaging
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  ApiClient.onUnauthorized = () {
-    container.read(authProvider.notifier).forceLogout();
-  };
+      // Initialize notification service
+      await NotificationService.instance.initialize();
+    } catch (e, stack) {
+      // Startup init failed (e.g. Firebase/network/platform-channel issue).
+      // Report it instead of letting it block runApp() below — the app
+      // still needs to render so the failure is visible and recoverable
+      // rather than an indefinite blank screen.
+      FlutterError.reportError(FlutterErrorDetails(exception: e, stack: stack));
+    }
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const LaundryApp(),
-    ),
-  );
+    // Single top-level container so the 401 interceptor can call forceLogout()
+    // without needing a BuildContext.
+    final container = ProviderContainer();
+
+    ApiClient.onUnauthorized = () {
+      container.read(authProvider.notifier).forceLogout();
+    };
+
+    runApp(
+      UncontrolledProviderScope(
+        container: container,
+        child: const LaundryApp(),
+      ),
+    );
+  }, (error, stack) {
+    FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack));
+  });
 }
 
 class LaundryApp extends ConsumerWidget {
