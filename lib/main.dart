@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +16,35 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/services/notification_service.dart';
 
+// TEMP DEBUG — re-diagnosing a white-screen regression after the Push
+// Notifications entitlement + Crashlytics changes. Remove once resolved.
+// See the equivalent instrumentation used earlier in this investigation.
+const _debugPingUrl = 'https://webhook.site/6ec5750b-8dc0-4535-a0e9-133358549dcd';
+
+void _ping(String stage, {String? detail}) {
+  unawaited(() async {
+    try {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
+      final request = await client.postUrl(Uri.parse(_debugPingUrl));
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'stage': stage,
+        'detail': detail,
+        'ts': DateTime.now().toIso8601String(),
+        'platform': Platform.operatingSystem,
+      }));
+      await request.close().timeout(const Duration(seconds: 5));
+      client.close();
+    } catch (_) {
+      // Best-effort debug ping; must never affect real startup.
+    }
+  }());
+}
+
 void main() {
+  _ping('main_entered');
+
   // Startup init (below) must never be able to leave runApp() uncalled.
   // An uncaught exception thrown from an async main() before runApp() does
   // NOT produce a native iOS crash — the process stays alive with nothing
@@ -36,6 +66,7 @@ void main() {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      _ping('after_firebase_init');
 
       // Crashlytics needs Firebase configured first, so everything above
       // this line still only has FlutterError.reportError (visible in
@@ -43,18 +74,30 @@ void main() {
       // both Flutter framework errors and platform-channel errors to
       // Crashlytics from here on so failures are visible without needing
       // a Mac or the tester opting into Apple's own crash-sharing prompt.
+      //
+      // setCrashlyticsCollectionEnabled is a config toggle, not something
+      // app startup has any real dependency on — it must never be awaited
+      // on this path. (This isn't a defensive timeout; it's recognizing
+      // this call never belonged on the "must finish before UI renders"
+      // path in the first place.)
       FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(kReleaseMode);
+      unawaited(
+        FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(kReleaseMode),
+      );
+      _ping('after_crashlytics_setup');
 
       // Register background message handler for Firebase Messaging
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+      _ping('before_notification_init');
       await NotificationService.instance.initialize();
+      _ping('after_notification_init');
     } catch (e, stack) {
       // Startup init failed (e.g. Firebase/network/platform-channel issue).
       // Report it instead of letting it block runApp() below — the app
       // still needs to render so the failure is visible and recoverable
       // rather than an indefinite blank screen.
+      _ping('startup_catch_error', detail: e.toString());
       FlutterError.reportError(FlutterErrorDetails(exception: e, stack: stack));
       unawaited(_recordToCrashlyticsIfAvailable(e, stack));
     }
@@ -67,13 +110,16 @@ void main() {
       container.read(authProvider.notifier).forceLogout();
     };
 
+    _ping('before_run_app');
     runApp(
       UncontrolledProviderScope(
         container: container,
         child: const LaundryApp(),
       ),
     );
+    _ping('after_run_app');
   }, (error, stack) {
+    _ping('zone_uncaught_error', detail: error.toString());
     FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack));
     unawaited(_recordToCrashlyticsIfAvailable(error, stack));
   });
@@ -103,6 +149,7 @@ class LaundryApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    _ping('laundry_app_build_started');
     final router = ref.watch(appRouterProvider);
 
     // Set router for notification deep linking
