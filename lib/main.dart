@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'core/api/api_client.dart';
@@ -36,23 +37,26 @@ void main() {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
+      // Crashlytics needs Firebase configured first, so everything above
+      // this line still only has FlutterError.reportError (visible in
+      // device logs / Xcode console) to fall back on if it fails. Route
+      // both Flutter framework errors and platform-channel errors to
+      // Crashlytics from here on so failures are visible without needing
+      // a Mac or the tester opting into Apple's own crash-sharing prompt.
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(kReleaseMode);
+
       // Register background message handler for Firebase Messaging
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // Initialize notification service. NotificationService.initialize()
-      // already timeout-guards its own platform-channel calls (see that
-      // file); this outer timeout is a second, coarser safety net so
-      // nothing inside this call — now or added later — can ever block
-      // runApp() below indefinitely.
-      await NotificationService.instance
-          .initialize()
-          .timeout(const Duration(seconds: 8));
+      await NotificationService.instance.initialize();
     } catch (e, stack) {
       // Startup init failed (e.g. Firebase/network/platform-channel issue).
       // Report it instead of letting it block runApp() below — the app
       // still needs to render so the failure is visible and recoverable
       // rather than an indefinite blank screen.
       FlutterError.reportError(FlutterErrorDetails(exception: e, stack: stack));
+      unawaited(_recordToCrashlyticsIfAvailable(e, stack));
     }
 
     // Single top-level container so the 401 interceptor can call forceLogout()
@@ -71,7 +75,21 @@ void main() {
     );
   }, (error, stack) {
     FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack));
+    unawaited(_recordToCrashlyticsIfAvailable(error, stack));
   });
+}
+
+/// Reports to Crashlytics if Firebase has finished initializing by the time
+/// this fires; otherwise this is a no-op (nothing more we can do — the
+/// FlutterError.reportError call alongside this is still visible in device
+/// logs regardless).
+Future<void> _recordToCrashlyticsIfAvailable(Object error, StackTrace stack) async {
+  if (Firebase.apps.isEmpty) return;
+  try {
+    await FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+  } catch (_) {
+    // Crashlytics itself failed to record; nothing further to do here.
+  }
 }
 
 class LaundryApp extends ConsumerWidget {

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,24 +80,22 @@ class NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
 
-      // Every platform-channel call below is timeout-guarded. On iOS,
-      // FirebaseMessaging calls can hang indefinitely (never resolve, never
-      // throw) when APNs registration never completes — e.g. the app is
-      // missing the aps-environment entitlement (Push Notifications
-      // capability). Since this runs on the critical path before runApp()
-      // in main.dart, an unbounded hang here means an indefinite blank
-      // screen with zero crash report. A timeout guarantees this method
-      // always completes so startup can never be blocked by it.
-      const platformCallTimeout = Duration(seconds: 5);
+      // These platform-channel calls depend on APNs registration having
+      // completed, which requires the aps-environment entitlement (Push
+      // Notifications capability, ios/Runner/Runner.entitlements) to be
+      // present and to match the provisioning profile. Without it, iOS can
+      // leave APNs registration permanently pending and these calls never
+      // resolve. If a hang recurs here, verify the entitlement is actually
+      // in the signed build (not just this repo) rather than re-adding a
+      // timeout — a stuck call is a signal the native config is wrong, and
+      // silently timing it out just hides that regression.
 
       // Configure foreground message presentation
-      await messaging
-          .setForegroundNotificationPresentationOptions(
-            alert: true,
-            badge: true,
-            sound: true,
-          )
-          .timeout(platformCallTimeout);
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       // Initialize local notifications. flutter_local_notifications has no
       // web plugin implementation (it only ships Android/iOS/macOS/Linux
@@ -105,7 +104,7 @@ class NotificationService {
       // registered. Web foreground messages get their sound played directly
       // via playWebNotificationSound() instead (see _handleForegroundMessage).
       if (!kIsWeb) {
-        await _initializeLocalNotifications().timeout(platformCallTimeout);
+        await _initializeLocalNotifications();
       }
 
       // Set up message handlers
@@ -113,8 +112,7 @@ class NotificationService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
       // Check for initial message (app opened from terminated state)
-      final initialMessage =
-          await messaging.getInitialMessage().timeout(platformCallTimeout);
+      final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
         _handleNotificationTap(initialMessage);
       }
@@ -128,8 +126,14 @@ class NotificationService {
       });
 
       debugPrint('[NotificationService] Firebase Messaging initialized successfully.');
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[NotificationService] Firebase initialization error: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        stack,
+        reason: 'NotificationService.initialize() failed',
+        fatal: false,
+      );
     }
   }
 

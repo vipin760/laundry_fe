@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -95,6 +95,23 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Firebase Phone Auth reCAPTCHA verification fallback (used when
+	     silent APNs push verification is unavailable or still propagating
+	     after enabling the Push Notifications capability). Scheme must be
+	     this app's Encoded App ID from Firebase Console, Project Settings,
+	     General, Your apps. Not REVERSED_CLIENT_ID, which is for
+	     Google Sign-In, a separate feature this app does not use. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-720667706724-ios-e0034bcb272036d671a671</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>
