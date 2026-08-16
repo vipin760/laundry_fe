@@ -80,9 +80,15 @@ void main() {
       // Register background message handler for Firebase Messaging
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // Initialize notification service
+      // Initialize notification service. NotificationService.initialize()
+      // already timeout-guards its own platform-channel calls (see that
+      // file); this outer timeout is a second, coarser safety net so
+      // nothing inside this call — now or added later — can ever block
+      // runApp() below indefinitely.
       _ping('before_notification_init');
-      await NotificationService.instance.initialize();
+      await NotificationService.instance
+          .initialize()
+          .timeout(const Duration(seconds: 8));
       _ping('after_notification_init');
     } catch (e, stack) {
       // Startup init failed (e.g. Firebase/network/platform-channel issue).

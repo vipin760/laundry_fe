@@ -79,12 +79,24 @@ class NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
 
+      // Every platform-channel call below is timeout-guarded. On iOS,
+      // FirebaseMessaging calls can hang indefinitely (never resolve, never
+      // throw) when APNs registration never completes — e.g. the app is
+      // missing the aps-environment entitlement (Push Notifications
+      // capability). Since this runs on the critical path before runApp()
+      // in main.dart, an unbounded hang here means an indefinite blank
+      // screen with zero crash report. A timeout guarantees this method
+      // always completes so startup can never be blocked by it.
+      const platformCallTimeout = Duration(seconds: 5);
+
       // Configure foreground message presentation
-      await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      await messaging
+          .setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          )
+          .timeout(platformCallTimeout);
 
       // Initialize local notifications. flutter_local_notifications has no
       // web plugin implementation (it only ships Android/iOS/macOS/Linux
@@ -93,7 +105,7 @@ class NotificationService {
       // registered. Web foreground messages get their sound played directly
       // via playWebNotificationSound() instead (see _handleForegroundMessage).
       if (!kIsWeb) {
-        await _initializeLocalNotifications();
+        await _initializeLocalNotifications().timeout(platformCallTimeout);
       }
 
       // Set up message handlers
@@ -101,7 +113,8 @@ class NotificationService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
       // Check for initial message (app opened from terminated state)
-      final initialMessage = await messaging.getInitialMessage();
+      final initialMessage =
+          await messaging.getInitialMessage().timeout(platformCallTimeout);
       if (initialMessage != null) {
         _handleNotificationTap(initialMessage);
       }
