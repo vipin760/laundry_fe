@@ -19,7 +19,7 @@ import 'core/services/notification_service.dart';
 // TEMP DEBUG — re-diagnosing a white-screen regression after the Push
 // Notifications entitlement + Crashlytics changes. Remove once resolved.
 // See the equivalent instrumentation used earlier in this investigation.
-const _debugPingUrl = 'https://webhook.site/6ec5750b-8dc0-4535-a0e9-133358549dcd';
+const _debugPingUrl = 'https://webhook.site/4c3536b6-26d1-4730-96fa-5c92efb09b96';
 
 void _ping(String stage, {String? detail}) {
   unawaited(() async {
