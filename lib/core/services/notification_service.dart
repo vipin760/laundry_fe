@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -11,25 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 
 import 'notification_sound.dart';
-
-// TEMP DEBUG — pinpointing exactly which awaited call inside initialize()
-// hangs. Remove alongside the equivalent instrumentation in main.dart.
-const _debugPingUrl = 'https://webhook.site/4c3536b6-26d1-4730-96fa-5c92efb09b96';
-
-void _ping(String stage) {
-  unawaited(() async {
-    try {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-      final request = await client.postUrl(Uri.parse(_debugPingUrl));
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode({'stage': stage, 'ts': DateTime.now().toIso8601String()}));
-      await request.close().timeout(const Duration(seconds: 5));
-      client.close();
-    } catch (_) {
-      // Best-effort debug ping; must never affect real startup.
-    }
-  }());
-}
 
 /// Permission status enum
 enum PermissionStatus {
@@ -101,24 +80,22 @@ class NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
 
-      // These platform-channel calls depend on APNs registration having
-      // completed, which requires the aps-environment entitlement (Push
-      // Notifications capability, ios/Runner/Runner.entitlements) to be
-      // present and to match the provisioning profile. Without it, iOS can
-      // leave APNs registration permanently pending and these calls never
-      // resolve. If a hang recurs here, verify the entitlement is actually
-      // in the signed build (not just this repo) rather than re-adding a
-      // timeout — a stuck call is a signal the native config is wrong, and
-      // silently timing it out just hides that regression.
+      // getInitialMessage() below only resolves once
+      // FLTFirebaseMessagingPlugin's UIApplicationDidFinishLaunchingNotification
+      // observer has fired (see ios/Runner/AppDelegate.swift for why plugins
+      // must be registered eagerly, before that notification posts, for
+      // this to work at all). If a hang recurs on this call specifically,
+      // check AppDelegate's plugin registration timing first rather than
+      // adding a timeout here — a stuck call is a signal of a native
+      // lifecycle/config regression, and silently timing it out just hides
+      // that rather than fixing it.
 
       // Configure foreground message presentation
-      _ping('before_set_foreground_options');
       await messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
       );
-      _ping('after_set_foreground_options');
 
       // Initialize local notifications. flutter_local_notifications has no
       // web plugin implementation (it only ships Android/iOS/macOS/Linux
@@ -127,9 +104,7 @@ class NotificationService {
       // registered. Web foreground messages get their sound played directly
       // via playWebNotificationSound() instead (see _handleForegroundMessage).
       if (!kIsWeb) {
-        _ping('before_local_notifications_init');
         await _initializeLocalNotifications();
-        _ping('after_local_notifications_init');
       }
 
       // Set up message handlers
@@ -137,9 +112,7 @@ class NotificationService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
       // Check for initial message (app opened from terminated state)
-      _ping('before_get_initial_message');
       final initialMessage = await messaging.getInitialMessage();
-      _ping('after_get_initial_message');
       if (initialMessage != null) {
         _handleNotificationTap(initialMessage);
       }
@@ -180,14 +153,12 @@ class NotificationService {
       iOS: iosSettings,
     );
 
-    _ping('before_flutter_local_notifications_plugin_initialize');
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         _handleLocalNotificationTap(response);
       },
     );
-    _ping('after_flutter_local_notifications_plugin_initialize');
 
     // Create Android notification channel
     await _localNotifications
