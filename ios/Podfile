@@ -29,6 +29,16 @@ target 'Runner' do
   use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Firebase Auth's phone-number verification falls back to reCAPTCHA
+  # Enterprise when silent APNs verification isn't available. firebase-ios-sdk
+  # 11.9.0+ (this project resolves to 11.15.0 via firebase_core) requires this
+  # pod to be linked explicitly -- Firebase/Auth only declares an optional
+  # interop dependency on it, not a hard one, so without this line phone auth
+  # fails at runtime with "The reCAPTCHA SDK is not linked to your app"
+  # instead of at build time.
+  pod 'RecaptchaEnterprise', '18.9.1'
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

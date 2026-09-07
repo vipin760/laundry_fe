@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,6 +80,16 @@ class NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
 
+      // getInitialMessage() below only resolves once
+      // FLTFirebaseMessagingPlugin's UIApplicationDidFinishLaunchingNotification
+      // observer has fired (see ios/Runner/AppDelegate.swift for why plugins
+      // must be registered eagerly, before that notification posts, for
+      // this to work at all). If a hang recurs on this call specifically,
+      // check AppDelegate's plugin registration timing first rather than
+      // adding a timeout here — a stuck call is a signal of a native
+      // lifecycle/config regression, and silently timing it out just hides
+      // that rather than fixing it.
+
       // Configure foreground message presentation
       await messaging.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -115,8 +126,14 @@ class NotificationService {
       });
 
       debugPrint('[NotificationService] Firebase Messaging initialized successfully.');
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[NotificationService] Firebase initialization error: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        stack,
+        reason: 'NotificationService.initialize() failed',
+        fatal: false,
+      );
     }
   }
 
