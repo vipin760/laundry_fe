@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +19,7 @@ import '../../referral/screens/refer_earn_home_screen.dart';
 import '../../account_deletion/screens/privacy_security_screen.dart';
 import '../../account_deletion/screens/delete_account_screen.dart';
 import '../../account_deletion/providers/delete_account_provider.dart';
+import '../../account_deletion/models/delete_account_models.dart';
 import '../../notifications/providers/notifications_provider.dart';
 import '../../notifications/screens/notifications_screen.dart';
 import '../../services/models/service_model.dart';
@@ -38,8 +41,68 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   int _tab = 0;
+
+  // ── iOS: auto-logout when an admin approves the deletion request ───────────
+  // The account isn't touched when the user *submits* the request — deletion
+  // happens later, on admin approval. This watches the backend deletion status
+  // and, the moment it flips to "deleted", forces a local logout and sends the
+  // user back to the login screen. Backend is the source of truth; the poll +
+  // resume-refresh just make it prompt without the user having to trigger an
+  // API call themselves (the global 401 interceptor is the ultimate fallback).
+  Timer? _deletionPoll;
+  bool _handlingAccountDeleted = false;
+
+  bool get _iosDeletionWatch =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_iosDeletionWatch) WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _deletionPoll?.cancel();
+    if (_iosDeletionWatch) WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // An admin approval usually lands while the app is backgrounded — re-check
+    // the deletion status the moment the user returns.
+    if (state == AppLifecycleState.resumed && _iosDeletionWatch && mounted) {
+      ref.invalidate(deleteRequestStatusProvider);
+    }
+  }
+
+  /// Keep a light poll running only while a deletion request is pending.
+  void _syncDeletionPoll(bool pending) {
+    if (pending && _deletionPoll == null) {
+      _deletionPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+        if (mounted) ref.invalidate(deleteRequestStatusProvider);
+      });
+    } else if (!pending && _deletionPoll != null) {
+      _deletionPoll!.cancel();
+      _deletionPoll = null;
+    }
+  }
+
+  Future<void> _onAccountDeleted() async {
+    if (_handlingAccountDeleted || !mounted) return;
+    _handlingAccountDeleted = true;
+    _deletionPoll?.cancel();
+    _deletionPoll = null;
+    // Clear the local session (skips the /auth/logout call, which would 401),
+    // then return to the login/welcome screen. The router's auth redirect also
+    // fires off forceLogout(); the explicit go() just makes it immediate.
+    await ref.read(authProvider.notifier).forceLogout();
+    if (mounted) context.go(AppRoutes.login);
+  }
 
   // ── Bottom nav items ───────────────────────────────────────────────────────
   static const _navItems = [
@@ -81,6 +144,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final user      = ref.watch(authProvider).user;
     final firstName = _firstName(user?.name);
+
+    // iOS: react to the backend deletion status changing under us.
+    if (_iosDeletionWatch) {
+      ref.listen<AsyncValue<DeleteRequestStatusResult>>(
+        deleteRequestStatusProvider,
+        (_, next) {
+          final s = next.whenOrNull(data: (v) => v);
+          if (s == null) return;
+          if (s.isDeleted) {
+            _onAccountDeleted();
+          } else {
+            _syncDeletionPoll(s.isPendingApproval);
+          }
+        },
+      );
+    }
 
     return Scaffold(
       backgroundColor: _kBg,
