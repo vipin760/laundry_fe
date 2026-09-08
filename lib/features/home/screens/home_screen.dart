@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ import '../../profile/screens/addresses_screen.dart';
 import '../../profile/screens/my_information_screen.dart';
 import '../../referral/screens/refer_earn_home_screen.dart';
 import '../../account_deletion/screens/privacy_security_screen.dart';
+import '../../account_deletion/screens/delete_account_screen.dart';
 import '../../notifications/providers/notifications_provider.dart';
 import '../../notifications/screens/notifications_screen.dart';
 import '../../services/models/service_model.dart';
@@ -1061,6 +1063,19 @@ class _ProfileTabState extends State<_ProfileTab> {
                 label: 'Privacy & Security',
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacySecurityScreen())),
               ),
+              // iOS app only: surface "Delete Account" directly in the Profile
+              // section so it's easy to discover (App Store Guideline
+              // 5.1.1(v)). Android and web are unchanged — they continue to
+              // reach the same flow via Privacy & Security above. Opens the
+              // existing DeleteAccountScreen; the deletion flow is untouched.
+              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+                _ProfileMenuItem(
+                  icon: Icons.delete_forever_outlined,
+                  iconBg: const Color(0xFFFDECEC),
+                  iconColor: const Color(0xFFD92D20),
+                  label: 'Delete Account',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeleteAccountScreen())),
+                ),
             ],
           ),
 
