@@ -6,15 +6,28 @@ class AccountDeletionApi {
   const AccountDeletionApi();
 
   /// POST /account/delete/request
+  ///
+  /// [flow] is optional and backward-compatible: omitting it keeps the
+  /// historical immediate behaviour (Android/Web). The iOS client passes
+  /// `'admin_approval'` so the request is parked for an admin to review.
   Future<DeleteRequestResult> request({
     required DeleteReason reason,
     String? comment,
+    String? flow,
   }) async {
     final res = await ApiClient.instance.post('/account/delete/request', data: {
       'reason': reason.apiValue,
       if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      if (flow != null && flow.isNotEmpty) 'flow': flow,
     });
     return DeleteRequestResult.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// GET /account/delete/status — backend source of truth for whether a
+  /// deletion request is pending / the account has been deleted.
+  Future<DeleteRequestStatusResult> status() async {
+    final res = await ApiClient.instance.get('/account/delete/status');
+    return DeleteRequestStatusResult.fromJson(res.data as Map<String, dynamic>);
   }
 
   /// POST /account/delete/send-otp

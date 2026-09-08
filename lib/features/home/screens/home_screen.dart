@@ -16,6 +16,7 @@ import '../../profile/screens/my_information_screen.dart';
 import '../../referral/screens/refer_earn_home_screen.dart';
 import '../../account_deletion/screens/privacy_security_screen.dart';
 import '../../account_deletion/screens/delete_account_screen.dart';
+import '../../account_deletion/providers/delete_account_provider.dart';
 import '../../notifications/providers/notifications_provider.dart';
 import '../../notifications/screens/notifications_screen.dart';
 import '../../services/models/service_model.dart';
@@ -1063,21 +1064,19 @@ class _ProfileTabState extends State<_ProfileTab> {
                 label: 'Privacy & Security',
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacySecurityScreen())),
               ),
-              // iOS app only: surface "Delete Account" directly in the Profile
-              // section so it's easy to discover (App Store Guideline
-              // 5.1.1(v)). Android and web are unchanged — they continue to
-              // reach the same flow via Privacy & Security above. Opens the
-              // existing DeleteAccountScreen; the deletion flow is untouched.
-              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
-                _ProfileMenuItem(
-                  icon: Icons.delete_forever_outlined,
-                  iconBg: const Color(0xFFFDECEC),
-                  iconColor: const Color(0xFFD92D20),
-                  label: 'Delete Account',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeleteAccountScreen())),
-                ),
             ],
           ),
+
+          // iOS app only: surface "Delete Account" directly in the Profile
+          // section so an App Store reviewer finds it immediately (Guideline
+          // 5.1.1(v)). Its own card (like Logout) so the shared menu group is
+          // untouched. Label/subtitle reflect the backend deletion-request
+          // status. Android and Web are unchanged — they reach the existing
+          // flow via Privacy & Security above.
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+            const SizedBox(height: 12),
+            const _DeleteAccountTile(),
+          ],
 
           const SizedBox(height: 20),
 
@@ -1102,6 +1101,45 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// iOS-only Profile entry for account deletion. Its label/subtitle are driven
+/// by the backend deletion-request status (deleteRequestStatusProvider), so the
+/// "Deletion Pending" state survives app restarts, re-login and device changes
+/// and is never inferred from local state alone.
+class _DeleteAccountTile extends ConsumerWidget {
+  const _DeleteAccountTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(deleteRequestStatusProvider).maybeWhen(
+          data: (s) => s.isPendingApproval,
+          orElse: () => false,
+        );
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Color(0x060A1645), blurRadius: 8, offset: Offset(0, 2))],
+      ),
+      child: _ProfileMenuItem(
+        icon: pending ? Icons.hourglass_bottom_rounded : Icons.delete_forever_outlined,
+        iconBg: const Color(0xFFFDECEC),
+        iconColor: const Color(0xFFD92D20),
+        label: pending ? 'Deletion Pending' : 'Delete Account',
+        subtitle: pending
+            ? 'Your deletion request is awaiting approval'
+            : 'Permanently delete your account',
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
+          );
+          ref.invalidate(deleteRequestStatusProvider);
+        },
       ),
     );
   }
@@ -1200,6 +1238,7 @@ class _ProfileMenuItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.trailing,
+    this.subtitle,
   });
   final IconData icon;
   final Color iconBg;
@@ -1207,6 +1246,7 @@ class _ProfileMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final Widget? trailing;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1225,8 +1265,19 @@ class _ProfileMenuItem extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(label,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A2340))),
+              child: subtitle == null
+                  ? Text(label,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A2340)))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A2340))),
+                        const SizedBox(height: 2),
+                        Text(subtitle!,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF7D86A5))),
+                      ],
+                    ),
             ),
             trailing ?? const Icon(Icons.chevron_right_rounded, color: Color(0xFFB0BAD5), size: 20),
           ],

@@ -33,11 +33,16 @@ class DeleteRequestResult {
   /// When false, the user can confirm deletion directly (already logged in).
   final bool verificationRequired;
 
+  /// True when the request was parked for admin approval (iOS flow) — nothing
+  /// was deleted; the account is now in PENDING_DELETION until an admin acts.
+  final bool pendingApproval;
+
   const DeleteRequestResult({
     required this.deleteRequestId,
     required this.status,
     this.walletBalance = 0,
     this.verificationRequired = false,
+    this.pendingApproval = false,
   });
 
   factory DeleteRequestResult.fromJson(Map<String, dynamic> json) {
@@ -46,8 +51,48 @@ class DeleteRequestResult {
       status: json['status']?.toString() ?? 'PENDING_VERIFICATION',
       walletBalance: (json['walletBalance'] as num?)?.toDouble() ?? 0,
       verificationRequired: json['verificationRequired'] as bool? ?? false,
+      pendingApproval: json['pendingApproval'] as bool? ?? false,
     );
   }
+}
+
+/// Response of GET /account/delete/status. The backend is the source of truth
+/// for whether a deletion request is pending — this must not be inferred from
+/// local state (it has to survive app restarts, re-login and device changes).
+class DeleteRequestStatusResult {
+  /// Whether the user has any deletion request on record.
+  final bool hasRequest;
+
+  /// Latest request lifecycle status (DeleteRequestStatus enum string), or null.
+  final String? status;
+
+  /// User account status: ACTIVE | PENDING_DELETION | DELETED | ANONYMIZED.
+  final String accountStatus;
+
+  const DeleteRequestStatusResult({
+    required this.hasRequest,
+    this.status,
+    this.accountStatus = 'ACTIVE',
+  });
+
+  factory DeleteRequestStatusResult.fromJson(Map<String, dynamic> json) {
+    return DeleteRequestStatusResult(
+      hasRequest: json['hasRequest'] as bool? ?? false,
+      status: json['status']?.toString(),
+      accountStatus: json['accountStatus']?.toString() ?? 'ACTIVE',
+    );
+  }
+
+  /// A request is awaiting an admin decision — block creating another one.
+  bool get isPendingApproval =>
+      status == 'PENDING_APPROVAL' || accountStatus == 'PENDING_DELETION';
+
+  /// The account has actually been deleted (or its data anonymised).
+  bool get isDeleted =>
+      accountStatus == 'DELETED' ||
+      accountStatus == 'ANONYMIZED' ||
+      status == 'COMPLETED' ||
+      status == 'CLEANED';
 }
 
 /// Response of POST /account/delete/verify.
