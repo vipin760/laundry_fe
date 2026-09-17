@@ -97,11 +97,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _handlingAccountDeleted = true;
     _deletionPoll?.cancel();
     _deletionPoll = null;
-    // Clear the local session (skips the /auth/logout call, which would 401),
-    // then return to the login/welcome screen. The router's auth redirect also
-    // fires off forceLogout(); the explicit go() just makes it immediate.
+    // Clear the local session (skips the /auth/logout call, which would 401).
+    // Home is guest-accessible, so drop back to the Home tab rather than the
+    // login screen — landing on /auth/login here would be a dead end (it has
+    // no back button/affordance since it no longer needs one to be reachable).
     await ref.read(authProvider.notifier).forceLogout();
-    if (mounted) context.go(AppRoutes.login);
+    if (mounted) setState(() => _tab = 0);
   }
 
   // ── Bottom nav items ───────────────────────────────────────────────────────
@@ -136,8 +137,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (ok == true) {
       ref.invalidate(walletProvider);
       await ref.read(authProvider.notifier).logout();
-      if (mounted) context.go(AppRoutes.login);
+      // Home is guest-accessible, so drop back to the Home tab rather than
+      // the login screen — landing on /auth/login here would be a dead end
+      // (it has no back button/affordance since it no longer needs one to
+      // be reachable).
+      if (mounted) setState(() => _tab = 0);
     }
+  }
+
+  // Payments (index 2) and Profile (index 3) are account-based — Home and
+  // Price (indices 0/1) are guest-browsable per App Store Guideline 5.1.1(v).
+  // A guest tapping either sends them to login instead of switching tabs;
+  // an authenticated user's navigation is unchanged.
+  void _onNavTap(int i) {
+    final isAccountTab = i == 2 || i == 3;
+    if (isAccountTab && !ref.read(authProvider).isAuthenticated) {
+      context.push(AppRoutes.login);
+      return;
+    }
+    setState(() => _tab = i);
   }
 
   @override
@@ -177,7 +195,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       bottomNavigationBar: _BottomNav(
         items: _navItems,
         current: _tab,
-        onTap: (i) => setState(() => _tab = i),
+        onTap: _onNavTap,
       ),
     );
   }

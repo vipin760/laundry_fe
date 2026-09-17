@@ -104,8 +104,13 @@ GoRouter _buildRouter(Ref ref) {
           loc.startsWith('/auth') || loc == AppRoutes.splash;
       // Terms & Privacy must be readable pre-login (from the auth screen)
       // as well as from within the app, so they never bounce to /auth/login.
-      final isPublicRoute =
-          loc == AppRoutes.terms || loc == AppRoutes.privacy;
+      // Home is also guest-accessible — App Store Guideline 5.1.1(v) requires
+      // browsing (services, pricing) to work without an account; only the
+      // account-based actions reachable from Home (cart, wallet, profile,
+      // checkout, etc.) still gate on isAuth, enforced at those tap sites.
+      final isPublicRoute = loc == AppRoutes.terms ||
+          loc == AppRoutes.privacy ||
+          loc == AppRoutes.home;
 
       final isPartner = auth.user?.isDeliveryPartner ?? false;
 

@@ -5,7 +5,10 @@ import 'package:laudry_app/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('shows LaundryBrew auth screen when unauthenticated',
+  // App Store Guideline 5.1.1(v): browsing must not require an account, so a
+  // fresh unauthenticated launch now lands on Home (guest-browsable) instead
+  // of forcing the auth screen. See app_router.dart / splash_screen.dart.
+  testWidgets('shows Home for guest browsing when unauthenticated',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
 
@@ -44,13 +47,14 @@ void main() {
     // instead of guessing the precise total.
     for (var i = 0; i < 100; i++) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.text('Welcome back!').evaluate().isNotEmpty) {
+      if (find.text('Welcome to LaundryBrew').evaluate().isNotEmpty) {
         break;
       }
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome back!'), findsOneWidget);
-    expect(find.text('Send OTP'), findsOneWidget);
+    // Guest lands on Home, not the login screen.
+    expect(find.text('Welcome to LaundryBrew'), findsOneWidget);
+    expect(find.text('Send OTP'), findsNothing);
   });
 }

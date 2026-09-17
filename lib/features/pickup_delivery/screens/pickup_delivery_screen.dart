@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../checkout/models/checkout_models.dart';
 import '../../checkout/providers/checkout_slot_provider.dart';
 import '../../checkout/screens/scheduling_screen.dart';
@@ -647,6 +650,14 @@ Future<void> handleAddToCart(
   ServiceModel service,
   String category,
 ) async {
+  // Adding to cart is account-based (App Store Guideline 5.1.1(v)) — guests
+  // must be sent to login instead of the item being optimistically added
+  // locally and silently failing server-side with a 401.
+  if (!ref.read(authProvider).isAuthenticated) {
+    context.push(AppRoutes.login);
+    return;
+  }
+
   final cart = ref.read(cartProvider);
   if (cart.conflictsWith(category)) {
     final other = category == 'instant' ? 'Scheduled' : 'Instant';
