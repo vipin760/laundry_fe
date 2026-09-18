@@ -113,8 +113,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _NavItem(label: 'Profile',  selected: Icons.person_rounded,                 unselected: Icons.person_outline_rounded),
   ];
 
+  // Guest (no user) or an authenticated user with no name on file both fall
+  // back to a neutral "User" — never a hardcoded/placeholder customer name.
   String _firstName(String? name) {
-    if (name == null || name.trim().isEmpty) return 'Rohan';
+    if (name == null || name.trim().isEmpty) return 'User';
     return name.trim().split(' ').first;
   }
 

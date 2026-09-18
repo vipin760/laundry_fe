@@ -100,10 +100,22 @@ class _PickupDeliveryScreenState
           // ── Location strip ────────────────────────────────────────────────
           _LocationStrip(
             address: selectedAddr,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CheckoutAddressScreen()),
-            ),
+            onTap: () {
+              // Selecting a delivery location here always ends in saving it
+              // to the account's address book (CheckoutAddressScreen only
+              // has one path: fill the form, POST /user/addresses) — that's
+              // account-based, unlike the public serviceability check this
+              // screen also does. Guests are sent to login before opening
+              // the screen, not after an unauthenticated API call fails.
+              if (!ref.read(authProvider).isAuthenticated) {
+                context.push(AppRoutes.login);
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CheckoutAddressScreen()),
+              );
+            },
           ),
           const Divider(height: 1, color: Color(0xFFE9EDFA)),
 
