@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../features/auth/screens/complete_profile_screen.dart';
 import '../../features/delivery/screens/delivery_partner_home_screen.dart';
 import '../../features/dev/screens/screen_navigator.dart';
 import '../../features/home/screens/home_screen.dart';
+import '../../features/referral/services/referral_deeplink_service.dart';
 import '../../features/more/screens/about_screen.dart';
 import '../../features/more/screens/blog_screen.dart';
 import '../../features/more/screens/care_instructions_screen.dart';
@@ -27,10 +30,16 @@ import '../../features/pickup_delivery/screens/delivery_slot_screen.dart';
 import '../../features/pickup_delivery/screens/pickup_delivery_screen.dart';
 import '../../features/pickup_delivery/screens/pickup_slot_screen.dart';
 import '../../features/pricing/screens/pricing_screen.dart';
-import '../../features/profile/screens/add_address_screen.dart';
+// The address form used everywhere else in the app. The profile/ duplicate
+// this route used to point at silently dropped the name and mobile fields it
+// collected, and has been removed.
+import '../../features/location/screens/add_edit_address_screen.dart';
 import '../../features/profile/screens/addresses_screen.dart';
 import '../../features/profile/screens/my_information_screen.dart';
-import '../../features/profile/screens/notifications_screen.dart';
+// The real notifications list. The former profile/ placeholder of the same
+// name has been removed so this named route and the home-screen bell icon
+// can't diverge again.
+import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/profile/screens/payment_methods_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/refer_earn_screen.dart';
@@ -78,6 +87,17 @@ GoRouter _buildRouter(Ref ref) {
 
       final loc = state.matchedLocation;
 
+      // Capture a referral code carried on the incoming URL (`?ref=CODE`),
+      // wherever the app was entered. This covers the web build and any
+      // platform deep link that already reaches GoRouter; it only stores the
+      // code for the signup field to pre-fill — nothing is applied without
+      // the user submitting it.
+      final referralCode = state.uri.queryParameters['ref'] ??
+          state.uri.queryParameters['code'];
+      if (referralCode != null && referralCode.trim().isNotEmpty) {
+        unawaited(ReferralDeepLinkService.captureFromUri(state.uri));
+      }
+
       // ── Global auth-initialization barrier ──────────────────────────────
       // On a fresh web load, GoRouter restores whatever URL is already in
       // the browser's address bar (e.g. /home after an F5 refresh) — it
@@ -102,15 +122,21 @@ GoRouter _buildRouter(Ref ref) {
       }
       final onAuthRoute =
           loc.startsWith('/auth') || loc == AppRoutes.splash;
-      // Terms & Privacy must be readable pre-login (from the auth screen)
-      // as well as from within the app, so they never bounce to /auth/login.
-      // Home is also guest-accessible — App Store Guideline 5.1.1(v) requires
-      // browsing (services, pricing) to work without an account; only the
-      // account-based actions reachable from Home (cart, wallet, profile,
-      // checkout, etc.) still gate on isAuth, enforced at those tap sites.
-      final isPublicRoute = loc == AppRoutes.terms ||
-          loc == AppRoutes.privacy ||
-          loc == AppRoutes.home;
+      // Browsable content (home, services, pricing, support, more) stays open
+      // to guests, matching App Store Guideline 5.1.1(v) — the classification
+      // lives in AppRoutes.isPublic so it can't drift per call site. In-app
+      // navigation mostly uses Navigator.push and never reaches this redirect;
+      // this matters for the paths that do — deep links, shared links, and a
+      // web refresh that restores the current URL.
+      final isPublicRoute = AppRoutes.isPublic(loc);
+
+      // The internal screen index is a development aid; it must not be
+      // reachable in a shipped build, including via a typed URL or deep link.
+      // Redirected rather than unregistered so the placeholder screens' "back
+      // to navigator" buttons still land somewhere valid in release.
+      if (!kDebugMode && loc.startsWith(AppRoutes.devScreens)) {
+        return AppRoutes.home;
+      }
 
       final isPartner = auth.user?.isDeliveryPartner ?? false;
 
@@ -280,7 +306,7 @@ GoRouter _buildRouter(Ref ref) {
       ),
       GoRoute(
         path: AppRoutes.addAddress,
-        builder: (_, _) => const AddAddressScreen(),
+        builder: (_, _) => const AddEditAddressScreen(),
       ),
       GoRoute(
         path: AppRoutes.paymentMethods,

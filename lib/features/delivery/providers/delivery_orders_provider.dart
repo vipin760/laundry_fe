@@ -5,6 +5,53 @@ import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../orders/models/order_model.dart';
 
+/// Outcome of a delivery-completion attempt.
+///
+/// [countsAsAttempt] is true only when the server actively rejected the OTP,
+/// so a flaky network never burns one of the rider's limited attempts.
+class CompleteDeliveryResult {
+  const CompleteDeliveryResult({
+    required this.success,
+    this.countsAsAttempt = false,
+    this.message,
+  });
+
+  final bool success;
+  final bool countsAsAttempt;
+  final String? message;
+}
+
+/// Client-side throttle for delivery-OTP entry.
+///
+/// This is defence-in-depth only — the backend remains authoritative for OTP
+/// validation, rate limiting and lockout. It lives on the notifier (rather
+/// than in the sheet's widget state) so that dismissing and reopening the
+/// sheet does not hand the user a fresh set of attempts.
+class OtpThrottleState {
+  const OtpThrottleState({this.failedAttempts = 0, this.lockedUntil});
+
+  final int failedAttempts;
+  final DateTime? lockedUntil;
+
+  static const maxAttempts = 5;
+  static const lockoutDuration = Duration(minutes: 1);
+
+  bool get isLocked =>
+      lockedUntil != null && DateTime.now().isBefore(lockedUntil!);
+
+  Duration get remainingLockout {
+    final until = lockedUntil;
+    if (until == null) return Duration.zero;
+    final left = until.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  int get attemptsLeft {
+    final left = maxAttempts - failedAttempts;
+    return left < 0 ? 0 : left;
+  }
+}
+
 /// State for the delivery partner's assigned orders.
 class DeliveryOrdersState {
   final List<OrderModel> active;
@@ -79,24 +126,89 @@ class DeliveryOrdersNotifier extends Notifier<DeliveryOrdersState> {
     }
   }
 
+  final _otpThrottle = <String, OtpThrottleState>{};
+
+  /// Current throttle for [orderId]. Once a lockout has elapsed the counter
+  /// starts over, so an expired lockout grants a fresh set of attempts rather
+  /// than leaving the rider one failure away from being locked again.
+  OtpThrottleState otpThrottleFor(String orderId) {
+    final stored = _otpThrottle[orderId];
+    if (stored == null) return const OtpThrottleState();
+    if (stored.lockedUntil != null && !stored.isLocked) {
+      _otpThrottle.remove(orderId);
+      return const OtpThrottleState();
+    }
+    return stored;
+  }
+
   /// Confirms handover by submitting the OTP the customer received after
-  /// payment. Returns null on success, or an error message to display.
-  Future<String?> completeDelivery(String orderId, String otp) async {
+  /// payment. The OTP itself is validated server-side — this only records
+  /// rejected attempts locally so the UI can throttle repeated guesses.
+  Future<CompleteDeliveryResult> completeDelivery(
+    String orderId,
+    String otp,
+  ) async {
+    final throttle = otpThrottleFor(orderId);
+    if (throttle.isLocked) {
+      return CompleteDeliveryResult(
+        success: false,
+        message: 'Too many incorrect attempts. Try again in '
+            '${throttle.remainingLockout.inSeconds}s.',
+      );
+    }
+
     try {
       await _dio.post(
         '/orders/$orderId/complete-delivery',
         data: {'otp': otp.trim()},
       );
+      _otpThrottle.remove(orderId);
       await fetchAssigned();
-      return null;
+      return const CompleteDeliveryResult(success: true);
     } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
       final message = e.response?.data is Map
           ? (e.response!.data['message']?.toString())
           : null;
-      return message ?? 'Could not verify the OTP. Please try again.';
+
+      // 429 means the backend is already throttling — surface its message and
+      // don't also burn a local attempt for it.
+      if (status == 429) {
+        return CompleteDeliveryResult(
+          success: false,
+          message: message ??
+              'Too many attempts. Please wait a moment and try again.',
+        );
+      }
+
+      // A response in the 4xx range is the server actively rejecting the OTP
+      // (or the request); anything else (timeout, no connection, 5xx) never
+      // reached a verification decision, so it must not count as an attempt.
+      final isRejection = status >= 400 && status < 500;
+      if (isRejection) _recordFailedOtpAttempt(orderId);
+
+      return CompleteDeliveryResult(
+        success: false,
+        countsAsAttempt: isRejection,
+        message: message ?? 'Could not verify the OTP. Please try again.',
+      );
     } catch (_) {
-      return 'Could not verify the OTP. Please try again.';
+      return const CompleteDeliveryResult(
+        success: false,
+        message: 'Could not verify the OTP. Please try again.',
+      );
     }
+  }
+
+  void _recordFailedOtpAttempt(String orderId) {
+    final current = otpThrottleFor(orderId);
+    final failed = current.failedAttempts + 1;
+    _otpThrottle[orderId] = OtpThrottleState(
+      failedAttempts: failed,
+      lockedUntil: failed >= OtpThrottleState.maxAttempts
+          ? DateTime.now().add(OtpThrottleState.lockoutDuration)
+          : null,
+    );
   }
 }
 

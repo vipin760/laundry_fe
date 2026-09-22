@@ -61,6 +61,7 @@ dependencies:
   url_launcher: ^6.3.2
   qr_flutter: ^4.1.0
   firebase_crashlytics: ^4.3.10
+  flutter_secure_storage: ^10.3.4
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +78,9 @@ dev_dependencies:
   # instead of hitting a real browser/OS URL handler.
   url_launcher_platform_interface: ^2.3.2
   plugin_platform_interface: ^2.1.8
+  # Test-only: fake the platform keystore in secure_session_store_test.dart
+  # so session migration can be verified without a real device.
+  flutter_secure_storage_platform_interface: ^2.1.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

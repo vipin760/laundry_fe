@@ -60,29 +60,10 @@ class _ServicesViewState extends ConsumerState<ServicesView> {
       return;
     }
 
-    if (!added) {
-      // Cart holds Scheduled services — only one order type at a time.
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: _ServiceText(
-              ref.read(cartProvider).errorMessage ??
-                  'You can order only one service type at a time.',
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            backgroundColor: const Color(0xFFD92D20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      return;
-    }
+    // Not added — either the cart already holds the other order type, or the
+    // server rejected the add and it was rolled back. Either way the reason is
+    // in cartProvider.errorMessage, which the ref.listen in build() reports.
+    if (!added) return;
 
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -127,6 +108,35 @@ class _ServicesViewState extends ConsumerState<ServicesView> {
 
   @override
   Widget build(BuildContext context) {
+    // Surfaces cart failures raised outside _onServiceTap — a rejected
+    // quantity change or removal from the cart sheet rolls the item back, and
+    // the user needs to see why rather than watching it silently reappear.
+    ref.listen<CartState>(cartProvider, (previous, next) {
+      final message = next.errorMessage;
+      if (message == null) return;
+      if (!mounted) return;
+      // Consume it, so an identical failure next time still notifies.
+      Future.microtask(() => ref.read(cartProvider.notifier).acknowledgeError());
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: _ServiceText(
+              message,
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            backgroundColor: const Color(0xFFD92D20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+    });
+
     final servicesAsyncValue = ref.watch(servicesProvider);
     final cartState = ref.watch(cartProvider);
 

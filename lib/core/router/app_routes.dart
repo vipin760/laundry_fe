@@ -76,4 +76,30 @@ abstract final class AppRoutes {
 
   // ── Dev (remove before production) ────────────────────────────────────────
   static const devScreens = '/dev/screens';
+
+  /// Route trees a signed-out visitor may open directly — via deep link,
+  /// shared link, or a web refresh that restores the URL from the address bar.
+  ///
+  /// Classified by what the screen actually shows rather than by route name:
+  /// catalogue and informational content is public, because App Store
+  /// Guideline 5.1.1(v) requires browsing to work without an account. Anything
+  /// backed by the user's own data (orders, wallet, profile, the checkout
+  /// flow) stays gated. Account-based *actions* reachable from a public screen
+  /// — add to cart, checkout, profile — are gated at their tap sites, which is
+  /// where the user gets a login prompt instead of a failed request.
+  static const _publicPrefixes = <String>[
+    home,
+    services, // and every /services/* category page
+    pricing,
+    support, // and /support/* — faqs, how-it-works, terms, privacy
+    more, // and /more/* — about, blog, care instructions, sustainability
+  ];
+
+  static bool isPublic(String location) {
+    final path = location.split('?').first;
+    for (final prefix in _publicPrefixes) {
+      if (path == prefix || path.startsWith('$prefix/')) return true;
+    }
+    return false;
+  }
 }

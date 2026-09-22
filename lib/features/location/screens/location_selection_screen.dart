@@ -55,6 +55,11 @@ class _LocationSelectionScreenState
   // Phase
   _Phase _phase = _Phase.locating;
 
+  /// Structured result of the last successful reverse geocode, used to fill
+  /// the address form. Null when geocoding hasn't succeeded for the current
+  /// pin position.
+  GeoPlacemark? _placemark;
+
   // Pin bounce animation
   late final AnimationController _pinAnim;
   late final Animation<double> _pinLift;
@@ -109,11 +114,20 @@ class _LocationSelectionScreenState
         ];
         setState(() {
           _address = parts.isNotEmpty ? parts.join(', ') : 'Selected location';
+          // Keep the structured result: the joined string above drops empty
+          // components, so recovering city/state/pincode by position from it
+          // silently shifts every later field up when one is missing.
+          _placemark = p;
         });
       }
     } catch (e, stackTrace) {
       debugPrint('[Location] reverse geocode failed: $e\n$stackTrace');
-      if (mounted) setState(() => _address = 'Unable to fetch address');
+      if (mounted) {
+        setState(() {
+          _address = 'Unable to fetch address';
+          _placemark = null;
+        });
+      }
     } finally {
       if (mounted) setState(() => _isGeocoding = false);
     }
@@ -189,6 +203,9 @@ class _LocationSelectionScreenState
           setState(() {
             _center = latLng;
             _address = address;
+            // Belongs to the previous pin — the camera-idle re-geocode will
+            // repopulate it for the newly selected place.
+            _placemark = null;
             _phase = _Phase.locating;
           });
         },
@@ -216,25 +233,23 @@ class _LocationSelectionScreenState
     );
   }
 
-  // Simple extraction helpers from reverse-geocoded string
-  String _extractArea() {
-    final parts = _address.split(', ');
-    return parts.isNotEmpty ? parts[0] : '';
-  }
+  // Address components come from the structured geocoding result, not from
+  // splitting the display string. A component the geocoder didn't return is
+  // left empty for the user to fill in, rather than being backfilled with the
+  // next field along (which used to label a city as the area, a state as the
+  // city, and so on).
+  String _extractArea() => _placemark?.subLocality?.trim() ?? '';
 
-  String _extractCity() {
-    final parts = _address.split(', ');
-    return parts.length > 1 ? parts[1] : '';
-  }
+  String _extractCity() => _placemark?.locality?.trim() ?? '';
 
-  String _extractState() {
-    final parts = _address.split(', ');
-    return parts.length > 2 ? parts[2] : '';
-  }
+  String _extractState() => _placemark?.administrativeArea?.trim() ?? '';
 
   String _extractPincode() {
-    final match = RegExp(r'\b\d{6}\b').firstMatch(_address);
-    return match?.group(0) ?? '';
+    final postal = _placemark?.postalCode?.trim();
+    if (postal != null && postal.isNotEmpty) return postal;
+    // Fall back to scanning the display string only when the geocoder gave no
+    // postal code at all.
+    return RegExp(r'\b\d{6}\b').firstMatch(_address)?.group(0) ?? '';
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────

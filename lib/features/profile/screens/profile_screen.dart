@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../../../core/api/api_client.dart';
+import '../../../core/services/notification_service.dart';
 import './referral_tab.dart';
 
 const _kPrimary = Color(0xFF1A23CC);
@@ -221,16 +225,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSettingsTile(
-            icon: Icons.notifications,
-            title: 'Push Notifications',
-            subtitle: 'Get order updates & offers',
-            trailing: Switch(
-              value: true,
-              onChanged: (value) {},
-              activeThumbColor: _kPrimary,
-            ),
-          ),
+          // Reflects the real OS permission instead of a switch that always
+          // read "on" and did nothing. Notifications can only be granted or
+          // revoked in system settings, so this reports state and sends the
+          // user there rather than pretending the app can toggle it.
+          const _NotificationPermissionTile(),
           _buildSettingsTile(
             icon: Icons.location_on,
             title: 'Location',
@@ -364,6 +363,136 @@ class _ProfileScreenState extends State<ProfileScreen>
               size: 16,
               color: Color(0xFFD1D5DB),
             ),
+      ),
+    );
+  }
+}
+
+/// Settings row showing the live notification permission.
+///
+/// Re-reads the status when the app is resumed, because the usual way this
+/// changes is the user leaving for system settings and coming back.
+class _NotificationPermissionTile extends StatefulWidget {
+  const _NotificationPermissionTile();
+
+  @override
+  State<_NotificationPermissionTile> createState() =>
+      _NotificationPermissionTileState();
+}
+
+class _NotificationPermissionTileState
+    extends State<_NotificationPermissionTile> with WidgetsBindingObserver {
+  PermissionStatus? _status;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final status = await NotificationService.instance.getLivePermissionStatus();
+    if (!mounted) return;
+    setState(() => _status = status);
+  }
+
+  Future<void> _onTap() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (_status == PermissionStatus.notRequested) {
+        // Never asked yet — the system prompt is still available.
+        await NotificationService.instance
+            .requestPermissionAndRegister(ApiClient.instance);
+      } else {
+        // Already granted or denied: only the OS can change it from here.
+        await Geolocator.openAppSettings();
+      }
+    } catch (e) {
+      debugPrint('[Profile] notification permission action failed: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+      await _refresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+
+    final (subtitle, trailingLabel, color) = switch (status) {
+      null => ('Checking…', '', const Color(0xFF6B7280)),
+      PermissionStatus.granted => (
+          'Order updates & offers are on',
+          'Enabled',
+          const Color(0xFF12B76A),
+        ),
+      PermissionStatus.provisional => (
+          'Delivered quietly — tap to manage',
+          'Quiet',
+          const Color(0xFFF79009),
+        ),
+      PermissionStatus.denied => (
+          'Turn on in Settings to get order updates',
+          'Disabled',
+          const Color(0xFFD92D20),
+        ),
+      PermissionStatus.notRequested => (
+          'Tap to get order updates & offers',
+          'Enable',
+          _kPrimary,
+        ),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        onTap: status == null || _busy ? null : _onTap,
+        leading: const Icon(Icons.notifications, color: _kPrimary, size: 24),
+        title: const Text(
+          'Push Notifications',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF111827),
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+        ),
+        trailing: _busy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                trailingLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
       ),
     );
   }

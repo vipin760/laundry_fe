@@ -99,8 +99,8 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
           'contact': user?.mobileNumber ?? '',
         },
       });
-
-      if (mounted) setState(() => _loading = false);
+      // _loading stays true until _onPaySuccess/_onPayError fires, so
+      // "Proceed to Pay" can't be tapped again before the sheet paints.
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
@@ -119,15 +119,35 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
   }
 
   void _onPaySuccess(PaymentSuccessResponse r) async {
-    if (_pendingWalletTxnId == null || _pendingRazorpayOrderId == null) return;
+    final walletTxnId = _pendingWalletTxnId;
+    final razorpayOrderId = _pendingRazorpayOrderId;
+    final paymentId = r.paymentId;
+    final signature = r.signature;
+
+    // Guarded rather than force-unwrapped: a success callback missing any of
+    // these can't be verified, and crashing here would lose the top-up.
+    if (walletTxnId == null ||
+        razorpayOrderId == null ||
+        paymentId == null ||
+        signature == null) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _showSnack(
+        'Payment could not be confirmed. If money was debited it will be '
+        'reconciled automatically — please check your wallet shortly.',
+        isError: true,
+      );
+      return;
+    }
+
     try {
       final newBalance = await ref
           .read(walletProvider.notifier)
           .verifyAddMoney(
-            walletTxnId:        _pendingWalletTxnId!,
-            razorpayOrderId:    _pendingRazorpayOrderId!,
-            razorpayPaymentId:  r.paymentId!,
-            razorpaySignature:  r.signature!,
+            walletTxnId:        walletTxnId,
+            razorpayOrderId:    razorpayOrderId,
+            razorpayPaymentId:  paymentId,
+            razorpaySignature:  signature,
           );
 
       if (!mounted) return;

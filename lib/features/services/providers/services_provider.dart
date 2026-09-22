@@ -5,6 +5,29 @@ import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../models/service_model.dart';
 
+/// Parses a catalogue payload one item at a time.
+///
+/// A single malformed or legacy service document must not take down the whole
+/// catalogue — the bad row is skipped and logged, and every valid service
+/// still loads. (clothTypesProvider already does this for its own payload;
+/// this brings services in line.) Dropping the row rather than defaulting its
+/// price is deliberate: showing a service at ₹0 would be worse than not
+/// offering it.
+List<ServiceModel> _parseServices(List<dynamic> rawData) {
+  final parsed = <ServiceModel>[];
+  for (final item in rawData) {
+    if (item is! Map) continue;
+    try {
+      parsed.add(
+        ServiceModel.fromJson(item.map((k, v) => MapEntry(k.toString(), v))),
+      );
+    } catch (e) {
+      debugPrint('[servicesProvider] skipping unreadable service: $e');
+    }
+  }
+  return parsed;
+}
+
 // Services are public (no auth required on the backend).
 // Not autoDispose — result stays cached so navigating away and back does not
 // trigger a new network call and show a loading spinner again.
@@ -31,11 +54,7 @@ final servicesProvider = FutureProvider<List<ServiceModel>>((ref) async {
 
     if (rawData is! List) return const [];
 
-    final services = rawData
-        .whereType<Map>()
-        .map((item) => item.map((k, v) => MapEntry(k.toString(), v)))
-        .map(ServiceModel.fromJson)
-        .toList(growable: false);
+    final services = _parseServices(rawData);
 
     final available = services
         .where((s) => s.isAvailable)
@@ -79,10 +98,7 @@ final popularServicesProvider =
     final rawData = payload is Map<String, dynamic> ? payload['data'] : payload;
 
     if (rawData is List && rawData.isNotEmpty) {
-      final popular = rawData
-          .whereType<Map>()
-          .map((item) => item.map((k, v) => MapEntry(k.toString(), v)))
-          .map(ServiceModel.fromJson)
+      final popular = _parseServices(rawData)
           .where((s) => s.isAvailable)
           .toList()
         ..sort((a, b) => (a.popularOrder ?? 99).compareTo(b.popularOrder ?? 99));
@@ -185,10 +201,7 @@ class PaginatedServicesNotifier extends Notifier<PaginatedServicesState> {
           : null;
 
       final fetched = (rawData is List)
-          ? rawData
-              .whereType<Map>()
-              .map((item) => item.map((k, v) => MapEntry(k.toString(), v)))
-              .map(ServiceModel.fromJson)
+          ? _parseServices(rawData)
               .where((s) => s.isAvailable)
               .toList(growable: false)
           : const <ServiceModel>[];

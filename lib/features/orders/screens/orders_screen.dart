@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
 import '../../checkout/services/payment_service.dart';
 import '../../wallet/providers/wallet_provider.dart';
@@ -487,13 +488,36 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
   }
 
   void _onPaySuccess(PaymentSuccessResponse r) async {
-    if (_currentOrderId == null) return;
+    final orderId = _currentOrderId;
+    final razorpayOrderId = r.orderId;
+    final paymentId = r.paymentId;
+    final signature = r.signature;
+
+    // Guarded rather than force-unwrapped: a success callback missing any of
+    // these can't be verified, and crashing here would lose the payment.
+    if (orderId == null ||
+        razorpayOrderId == null ||
+        paymentId == null ||
+        signature == null) {
+      if (!mounted) return;
+      setState(() => _paying = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+          'Payment could not be confirmed. If money was debited it will be '
+          'reconciled automatically — please check back shortly.',
+        ),
+        backgroundColor: _kRed,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
     try {
       await _paymentService.verifyPayment(
-        orderId: _currentOrderId!,
-        razorpayOrderId: r.orderId!,
-        razorpayPaymentId: r.paymentId!,
-        razorpaySignature: r.signature!,
+        orderId: orderId,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
       );
       if (!mounted) return;
       setState(() => _paying = false);
@@ -526,6 +550,7 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
       _currentOrderId = data['orderId']?.toString() ?? widget.order.id;
       final razorpayOrderId = data['razorpayOrderId'] as String? ?? '';
       final amount = (data['amount'] as num?)?.toInt() ?? 0;
+      final user = ref.read(authProvider).user;
 
       _razorpay.open({
         'key': PaymentConfig.razorpayKeyId,
@@ -535,10 +560,14 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
         'description': 'Laundry Order #${widget.order.displayNumber}',
         'retry': {'enabled': true, 'max_count': 1},
         'send_sms_hash': true,
-        'prefill': {'contact': '8888888888', 'email': 'test@razorpay.com'},
+        'prefill': PaymentConfig.prefillFor(
+          contact: user?.mobileNumber,
+          email: user?.email,
+        ),
         'external': {'wallets': ['paytm']},
       });
-      if (mounted) setState(() => _paying = false);
+      // _paying stays true until _onPaySuccess/_onPayError fires, so the Pay
+      // button can't be tapped again in the gap before the sheet paints.
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
@@ -1059,6 +1088,10 @@ class _ProgressStepper extends StatelessWidget {
     ('Delivered',  Icons.home_rounded),
   ];
 
+  /// 1-based step for this stepper's six labels. Derived from the shared
+  /// timeline index so a self-pickup order (READY_FOR_PICKUP) no longer falls
+  /// through to "step 1", and an unrecognised status shows no progress at all
+  /// rather than claiming the order was just placed.
   int get _currentStep {
     switch (status) {
       case OrderStatus.orderPlaced:    return 1;
@@ -1066,8 +1099,10 @@ class _ProgressStepper extends StatelessWidget {
       case OrderStatus.itemized:       return 2;
       case OrderStatus.brewing:        return 3;
       case OrderStatus.outForDelivery: return 5;
+      case OrderStatus.readyForPickup: return 5;
       case OrderStatus.completed:      return 6;
-      default:                         return 1;
+      case OrderStatus.cancelled:      return 0;
+      case OrderStatus.unknown:        return 0;
     }
   }
 
@@ -1161,16 +1196,20 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color, bg) = switch (status) {
-      OrderStatus.orderPlaced    => ('Confirmed',        _kPrimary, _kPrimaryBg),
-      OrderStatus.pickupAssigned => ('Pickup Assigned',  _kOrange,  _kOrangeBg),
-      OrderStatus.itemized       => ('Itemized',         _kOrange,  _kOrangeBg),
-      OrderStatus.brewing        => ('Brewing',           _kGreen,   _kGreenBg),
-      OrderStatus.outForDelivery => ('Out for Delivery', _kPrimary, _kPrimaryBg),
-      OrderStatus.readyForPickup => ('Ready for Delivery', _kPrimary, _kPrimaryBg),
-      OrderStatus.completed      => ('Delivered',        _kGreen,   _kGreenBg),
-      OrderStatus.cancelled      => ('Cancelled',        _kRed,     _kRedBg),
+    // Label comes from the shared mapper so every screen names a status the
+    // same way; only the colours are local to this screen.
+    final (color, bg) = switch (status) {
+      OrderStatus.orderPlaced    => (_kPrimary, _kPrimaryBg),
+      OrderStatus.pickupAssigned => (_kOrange,  _kOrangeBg),
+      OrderStatus.itemized       => (_kOrange,  _kOrangeBg),
+      OrderStatus.brewing        => (_kGreen,   _kGreenBg),
+      OrderStatus.outForDelivery => (_kPrimary, _kPrimaryBg),
+      OrderStatus.readyForPickup => (_kPrimary, _kPrimaryBg),
+      OrderStatus.completed      => (_kGreen,   _kGreenBg),
+      OrderStatus.cancelled      => (_kRed,     _kRedBg),
+      OrderStatus.unknown        => (_kMuted,   Color(0xFFF1F3F9)),
     };
+    final label = OrderStatusMapper.label(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(

@@ -19,7 +19,10 @@ class AppNotificationModel {
 
   factory AppNotificationModel.fromJson(Map<String, dynamic> json) {
     return AppNotificationModel(
-      id: json['_id'] as String,
+      // Coerced, not cast: every other field here tolerates a missing value,
+      // and a hard cast on this one would fail the entire list load over a
+      // single bad row.
+      id: json['_id']?.toString() ?? '',
       title: json['title'] as String? ?? '',
       body: json['body'] as String? ?? '',
       type: json['type'] as String? ?? 'general',

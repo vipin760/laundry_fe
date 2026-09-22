@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
@@ -112,10 +113,12 @@ class LocationNotifier extends Notifier<LocationState> {
         serviceability: result,
         isChecking: false,
       );
-    } catch (_) {
-      // Network / server error — assume serviceable so the flow is not blocked.
+    } catch (e) {
+      // Network / server error — the check never produced an answer, so report
+      // that honestly and let the user retry rather than assuming coverage.
+      debugPrint('[locationProvider] serviceability check failed: $e');
       state = state.copyWith(
-        serviceability: ServiceabilityResult.assumed,
+        serviceability: ServiceabilityResult.unverified,
         isChecking: false,
       );
     }

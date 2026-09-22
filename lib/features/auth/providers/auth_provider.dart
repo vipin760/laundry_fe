@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/secure_session_store.dart';
 import '../models/auth_user.dart';
 import '../../services/providers/cart_provider.dart' show clearCartLocalCache;
 
@@ -109,9 +110,10 @@ class AuthNotifier extends Notifier<AuthState> {
     _isCheckingAuthStatus = true;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
-      final encodedUser = prefs.getString('auth_user');
+      // Reads from secure storage, transparently migrating a session written
+      // by an older (plaintext) build so upgrades don't sign people out.
+      final token = await SecureSessionStore.readToken();
+      final encodedUser = await SecureSessionStore.readUserJson();
 
       if (token != null && token.isNotEmpty) {
         ApiClient.setToken(token);
@@ -279,32 +281,6 @@ class AuthNotifier extends Notifier<AuthState> {
     );
   }
 
-  Future<bool> forgotPassword(String email) async {
-    state = state.copyWith(isLoading: true, clearError: true);
-
-    try {
-      await ApiClient.instance.post(
-        '/auth/forgot-password',
-        data: {'email': email},
-      );
-
-      state = state.copyWith(isLoading: false);
-      return true;
-    } on DioException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: _extractErrorMessage(
-          e,
-          fallback: 'Failed to send reset token. Please try again.',
-        ),
-      );
-      return false;
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      return false;
-    }
-  }
-
   /// Updates the user's name and/or photoUrl.
   /// Both fields are optional — pass null to leave unchanged.
   Future<void> updateProfile({String? name, String? photoUrl}) async {
@@ -323,8 +299,9 @@ class AuthNotifier extends Notifier<AuthState> {
           photoUrl: data['photoUrl']?.toString() ?? state.user?.photoUrl,
         );
         if (updatedUser != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_user', jsonEncode(updatedUser.toJson()));
+          await SecureSessionStore.saveUserJson(
+            jsonEncode(updatedUser.toJson()),
+          );
           state = state.copyWith(isLoading: false, user: updatedUser, clearError: true);
           return;
         }
@@ -404,11 +381,12 @@ class AuthNotifier extends Notifier<AuthState> {
     AuthUser user, {
     bool isNewUser = false,
   }) async {
-    debugPrint('[AUTH] _saveSession() started with token: ${token.substring(0, 10)}...');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('jwt_token', token);
-    await prefs.setString('auth_user', jsonEncode(user.toJson()));
-    debugPrint('[AUTH] JWT Saved: ${token.substring(0, 10)}...');
+    debugPrint('[AUTH] _saveSession() started');
+    await SecureSessionStore.saveSession(
+      token: token,
+      userJson: jsonEncode(user.toJson()),
+    );
+    debugPrint('[AUTH] session stored');
     ApiClient.setToken(token);
 
     // Set authenticated state FIRST so GoRouter redirect fires with the
@@ -435,20 +413,14 @@ class AuthNotifier extends Notifier<AuthState> {
     await NotificationService.instance.processPendingTokenRefresh(ApiClient.instance);
   }
 
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
-    await prefs.remove('auth_user');
-
-    // Tell the server to revoke the token (best-effort).
-    try {
-      await ApiClient.instance.post('/auth/logout');
-    } catch (_) {}
-
-    await ApiClient.clearToken();
-
-    // Remove FCM token from backend before clearing local state
-    // This prevents dead token accumulation in the database
+  /// Detaches this device from the signed-in account's push notifications.
+  ///
+  /// Must run *before* the Authorization header is cleared, since the call
+  /// itself is authenticated. Best-effort by design: on a forced logout the
+  /// token is already invalid, so the server rejects this and the association
+  /// can only be cleaned up backend-side (on the next login the device token
+  /// re-registers against the new user).
+  Future<void> _deregisterFcmToken() async {
     try {
       final currentToken = await NotificationService.instance.getStoredToken();
       if (currentToken != null && currentToken.isNotEmpty) {
@@ -458,12 +430,54 @@ class AuthNotifier extends Notifier<AuthState> {
         );
       }
     } catch (e) {
-      // Never block logout if token removal fails
+      // Never block logout if token removal fails.
       debugPrint('[AuthProvider] Failed to remove FCM token from backend: $e');
     }
-
-    // Clear FCM token state to clean up push notification registration
     await NotificationService.instance.clearTokenState();
+  }
+
+  /// Ends the Firebase phone-auth session. Without this the previous user's
+  /// Firebase identity outlives an app logout and is inherited by whoever
+  /// signs in next on the same device.
+  Future<void> _signOutFirebase() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      // Firebase may be unavailable/uninitialised — never block logout.
+      debugPrint('[AuthProvider] Firebase signOut failed: $e');
+    }
+  }
+
+  /// Guards the teardown paths against re-entry. Both make authenticated
+  /// calls that can themselves 401, which routes back here through the
+  /// interceptor — without this, a logout can re-enter itself mid-teardown.
+  bool _tearingDown = false;
+
+  Future<void> logout() async {
+    if (_tearingDown) return;
+    _tearingDown = true;
+    try {
+      await _logout();
+    } finally {
+      _tearingDown = false;
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Tell the server to revoke the token (best-effort).
+    try {
+      await ApiClient.instance.post('/auth/logout');
+    } catch (_) {}
+
+    // Both of the above run while the Authorization header is still attached;
+    // the stored session is only dropped afterwards.
+    await _deregisterFcmToken();
+
+    await SecureSessionStore.clear();
+    await ApiClient.clearToken();
+    await _signOutFirebase();
 
     // Wipe the legacy local cart cache. Deliberately NOT
     // `ref.read(cartProvider.notifier).clearCart()` — cartProvider watches
@@ -492,13 +506,25 @@ class AuthNotifier extends Notifier<AuthState> {
   /// rejected (token expired/revoked). Skips the /auth/logout API call
   /// (token is already invalid) and resets all local state immediately.
   Future<void> forceLogout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
-    await prefs.remove('auth_user');
-    await ApiClient.clearToken();
+    if (_tearingDown) return;
+    _tearingDown = true;
+    try {
+      await _forceLogout();
+    } finally {
+      _tearingDown = false;
+    }
+  }
 
-    // Clear FCM token state to clean up push notification registration
-    await NotificationService.instance.clearTokenState();
+  Future<void> _forceLogout() async {
+    // Same teardown as an explicit logout: attempt server-side FCM
+    // deregistration (usually rejected here, since the token is what expired)
+    // and always clear the local association so this device stops being
+    // treated as the previous user's.
+    await _deregisterFcmToken();
+
+    await SecureSessionStore.clear();
+    await ApiClient.clearToken();
+    await _signOutFirebase();
 
     // cartProvider/addressesProvider/walletProvider watch this state
     // directly, so they auto-rebuild to their logged-out (empty) shape now

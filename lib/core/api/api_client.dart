@@ -42,24 +42,29 @@ class ApiClient {
       _dio.interceptors.add(CookieManager(cookieJar));
     }
 
-    // Global 401 interceptor — clears token and triggers logout when an
+    // Global 401 interceptor — clears the session and triggers logout when an
     // *authenticated* request is rejected by the server.
     //
     // A 401 on a request that never carried an Authorization header just
     // means we tried to call a protected endpoint before login/restore
     // finished (e.g. a cart fetch racing app-start token restoration on
-    // web refresh) — that is not a session being revoked, so it must not
-    // trigger forceLogout(). Treating it as one would wipe a token that
-    // was mid-restore, and (because forceLogout() invalidates the very
-    // provider that just failed) create an unbounded retry loop.
+    // web refresh) — that is not a session being revoked. Such a response is
+    // left entirely alone: clearing credentials here would wipe a token that
+    // was mid-restore and strand the app in a state where it still looks
+    // signed in while every subsequent request goes out unauthenticated (and,
+    // carrying no header, keeps failing this same way forever).
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onError: (DioException error, ErrorInterceptorHandler handler) {
+        onError: (DioException error, ErrorInterceptorHandler handler) async {
           if (error.response?.statusCode == 401) {
             final hadAuthHeader =
                 error.requestOptions.headers['Authorization'] != null;
-            clearToken();
-            if (hadAuthHeader) {
+
+            // Several authenticated requests can be in flight when a token is
+            // revoked; they must not each tear the session down in turn.
+            if (hadAuthHeader && !_handlingUnauthorized) {
+              _handlingUnauthorized = true;
+              await clearToken();
               onUnauthorized?.call();
             }
           }
@@ -69,12 +74,17 @@ class ApiClient {
     );
   }
 
+  /// Guards against concurrent 401s each triggering their own forced logout.
+  /// Reset by [setToken], so a newly established session starts clean.
+  static bool _handlingUnauthorized = false;
+
   static Dio get instance => _dio;
 
   static String get baseUrl => _configuredBaseUrl;
 
   static void setToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
+    _handlingUnauthorized = false;
   }
 
   static Future<void> clearToken() async {

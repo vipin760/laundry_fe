@@ -8,6 +8,7 @@ import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/widgets/app_text.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
 import '../../checkout/services/payment_service.dart';
 import '../../checkout/widgets/coupon_input_widget.dart';
@@ -101,13 +102,33 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   /// Only after the backend has verified the Razorpay signature do we treat
   /// this as a real success — never trust the SDK's success callback alone.
   void _onPaySuccess(PaymentSuccessResponse r) async {
-    if (_currentOrderId == null) return;
+    final orderId = _currentOrderId;
+    final razorpayOrderId = r.orderId;
+    final paymentId = r.paymentId;
+    final signature = r.signature;
+
+    // Guarded rather than force-unwrapped: a success callback missing any of
+    // these can't be verified, and crashing here would lose the payment.
+    if (orderId == null ||
+        razorpayOrderId == null ||
+        paymentId == null ||
+        signature == null) {
+      if (!mounted) return;
+      setState(() {
+        _paying = false;
+        _payError =
+            'Payment could not be confirmed. If money was debited it will be '
+            'reconciled automatically — please check back shortly.';
+      });
+      return;
+    }
+
     try {
       await _paymentService.verifyPayment(
-        orderId: _currentOrderId!,
-        razorpayOrderId: r.orderId!,
-        razorpayPaymentId: r.paymentId!,
-        razorpaySignature: r.signature!,
+        orderId: orderId,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
       );
       if (!mounted) return;
       setState(() { _paying = false; _payError = null; });
@@ -145,6 +166,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       _currentOrderId = data['orderId']?.toString() ?? _order!.id;
       final razorpayOrderId = data['razorpayOrderId'] as String? ?? '';
       final amount = (data['amount'] as num?)?.toInt() ?? 0;
+      final user = ref.read(authProvider).user;
 
       // Open payment via Razorpay — completion is handled by _onPaySuccess/
       // _onPayError above, registered in initState(), not here.
@@ -154,14 +176,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         'name': 'LaundryBrew',
         'order_id': razorpayOrderId,
         'description': 'Laundry Order #${_order!.displayNumber}',
-        'prefill': {
-          'contact': '8888888888',
-          'email': 'customer@laundrybrew.com',
-        },
+        'prefill': PaymentConfig.prefillFor(
+          contact: user?.mobileNumber,
+          email: user?.email,
+        ),
       });
-
-      if (!mounted) return;
-      setState(() { _paying = false; });
+      // _paying stays true until _onPaySuccess/_onPayError fires, so the Pay
+      // button can't be tapped again in the gap before the sheet paints.
     } catch (e) {
       if (_currentOrderId != null) await _paymentService.markPaymentFailed(_currentOrderId!);
       if (!mounted) return;

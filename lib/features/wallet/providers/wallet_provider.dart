@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -62,8 +64,37 @@ class WalletNotifier extends Notifier<WalletState> {
         balance: (data['balance'] as num?)?.toDouble() ?? 0,
         transactions: _parseTxns(data['transactions']),
       );
+    } on DioException catch (e) {
+      debugPrint('[walletProvider] fetch failed: ${e.type} ${e.message}');
+      state = state.copyWith(isLoading: false, error: _friendlyMessage(e));
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint('[walletProvider] fetch failed: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Unable to load your wallet right now. Please try again.',
+      );
+    }
+  }
+
+  /// Maps transport-level failures to something a customer can act on. The
+  /// raw DioException text (which used to be rendered straight into the
+  /// wallet screen) stays in the logs.
+  String _friendlyMessage(DioException e) {
+    final serverMessage = e.response?.data is Map
+        ? (e.response!.data['message']?.toString())
+        : null;
+    if (serverMessage != null && serverMessage.isNotEmpty) return serverMessage;
+
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return 'This is taking longer than usual. Please try again.';
+      case DioExceptionType.connectionError:
+        return 'No internet connection. Please check your network and '
+            'try again.';
+      default:
+        return 'Unable to load your wallet right now. Please try again.';
     }
   }
 

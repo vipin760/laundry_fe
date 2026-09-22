@@ -1,19 +1,10 @@
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
 import '../../location/models/address_model.dart';
+import 'order_status.dart';
 
-enum OrderStatus {
-  orderPlaced,
-  pickupAssigned,
-  itemized,
-  /// PROCESSING on backend — clothes being cleaned, user pays at this stage
-  brewing,
-  /// HOME_DELIVERY orders only
-  outForDelivery,
-  /// SELF_PICKUP orders only — ready to collect at the shop
-  readyForPickup,
-  completed,
-  cancelled,
-}
+// OrderStatus and its mapper live in order_status.dart; re-exported here so
+// existing `import 'order_model.dart'` call sites keep working unchanged.
+export 'order_status.dart';
 
 enum PaymentStatus {
   pending,
@@ -296,18 +287,29 @@ class OrderModel {
       status: _parseOrderStatus(json['status']),
       paymentStatus: _parsePaymentStatus(json['paymentStatus']),
       address: json['address'],
-      customer: json['customer'] != null
-          ? DeliveryCustomerContact.fromJson(json['customer'] as Map<String, dynamic>)
+      // These nested objects arrive as a Map when populated, but can come
+      // back as a bare id string (or be absent) — a cast would throw and take
+      // the whole order down with it.
+      customer: json['customer'] is Map<String, dynamic>
+          ? DeliveryCustomerContact.fromJson(
+              json['customer'] as Map<String, dynamic>)
           : null,
-      receptionDetails: json['receptionDetails'] != null
-          ? DeliveryReceptionDetails.fromJson(json['receptionDetails'] as Map<String, dynamic>)
+      receptionDetails: json['receptionDetails'] is Map<String, dynamic>
+          ? DeliveryReceptionDetails.fromJson(
+              json['receptionDetails'] as Map<String, dynamic>)
           : null,
       deliveryType: _parseDeliveryType(json['deliveryType']),
-      deliveryAddress: json['deliveryAddress'] != null
+      deliveryAddress: json['deliveryAddress'] is Map<String, dynamic>
           ? AddressModel.fromJson(json['deliveryAddress'] as Map<String, dynamic>)
           : null,
-      shopName: (json['locationSnapshot'] as Map<String, dynamic>?)?['shopName'] as String?,
-      createdAt: DateTime.parse(json['createdAt']),
+      shopName: (json['locationSnapshot'] is Map<String, dynamic>)
+          ? (json['locationSnapshot'] as Map<String, dynamic>)['shopName']
+              ?.toString()
+          : null,
+      // A missing or unparseable createdAt must not throw: every order screen
+      // renders this, so it would blank the screen rather than lose one line.
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
       pickupDate: json['pickupDate'] != null
           ? DateTime.tryParse(json['pickupDate'])
           : null,
@@ -341,21 +343,10 @@ class OrderModel {
     );
   }
 
-  static OrderStatus _parseOrderStatus(String? status) {
-    switch (status) {
-      case 'ORDER_PLACED':     return OrderStatus.orderPlaced;
-      case 'PICKUP_ASSIGNED':  return OrderStatus.pickupAssigned;
-      case 'ITEMIZED':         return OrderStatus.itemized;
-      case 'PROCESSING':       return OrderStatus.brewing;
-      case 'OUT_FOR_DELIVERY': return OrderStatus.outForDelivery;
-      case 'READY_FOR_PICKUP': return OrderStatus.readyForPickup;
-      case 'COMPLETED':        return OrderStatus.completed;
-      case 'CANCELLED':        return OrderStatus.cancelled;
-      default:                 return OrderStatus.orderPlaced;
-    }
-  }
+  static OrderStatus _parseOrderStatus(Object? status) =>
+      OrderStatusMapper.fromApi(status);
 
-  static PaymentStatus _parsePaymentStatus(String? status) {
+  static PaymentStatus _parsePaymentStatus(Object? status) {
     switch (status) {
       case 'PENDING':   return PaymentStatus.pending;
       case 'COMPLETED': return PaymentStatus.completed;
@@ -364,7 +355,7 @@ class OrderModel {
     }
   }
 
-  static DeliveryType _parseDeliveryType(String? type) {
+  static DeliveryType _parseDeliveryType(Object? type) {
     switch (type) {
       case 'SELF_PICKUP': return DeliveryType.selfPickup;
       default:             return DeliveryType.homeDelivery;

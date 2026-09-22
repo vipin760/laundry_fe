@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -385,13 +387,47 @@ class _OtpConfirmSheetState extends ConsumerState<_OtpConfirmSheet> {
   bool _submitting = false;
   String? _error;
 
+  /// Ticks once a second while a lockout is active, purely to refresh the
+  /// countdown label. Cancelled in dispose() so it can never fire setState on
+  /// a disposed sheet.
+  Timer? _lockTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncLockTicker();
+  }
+
   @override
   void dispose() {
+    _lockTicker?.cancel();
     _otpController.dispose();
     super.dispose();
   }
 
+  OtpThrottleState get _throttle => ref
+      .read(deliveryOrdersProvider.notifier)
+      .otpThrottleFor(widget.order.id);
+
+  void _syncLockTicker() {
+    if (_throttle.isLocked) {
+      _lockTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() {});
+        if (!_throttle.isLocked) {
+          _lockTicker?.cancel();
+          _lockTicker = null;
+        }
+      });
+    } else {
+      _lockTicker?.cancel();
+      _lockTicker = null;
+    }
+  }
+
   Future<void> _submit() async {
+    if (_submitting || _throttle.isLocked) return;
+
     final otp = _otpController.text.trim();
     if (otp.length != 4) {
       setState(() => _error = 'Please enter the 4-digit OTP.');
@@ -403,17 +439,23 @@ class _OtpConfirmSheetState extends ConsumerState<_OtpConfirmSheet> {
       _error = null;
     });
 
-    final error = await ref
+    final result = await ref
         .read(deliveryOrdersProvider.notifier)
         .completeDelivery(widget.order.id, otp);
 
     if (!mounted) return;
 
-    if (error != null) {
+    if (!result.success) {
+      final throttle = _throttle;
       setState(() {
         _submitting = false;
-        _error = error;
+        _error = throttle.isLocked
+            ? 'Too many incorrect attempts. Please ask the customer to '
+                'confirm the code, then try again shortly.'
+            : result.message;
+        if (result.countsAsAttempt) _otpController.clear();
       });
+      _syncLockTicker();
       return;
     }
 
@@ -430,6 +472,10 @@ class _OtpConfirmSheetState extends ConsumerState<_OtpConfirmSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final throttle = _throttle;
+    final isLocked = throttle.isLocked;
+    final lockSeconds = throttle.remainingLockout.inSeconds;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 24,
@@ -454,7 +500,7 @@ class _OtpConfirmSheetState extends ConsumerState<_OtpConfirmSheet> {
           const SizedBox(height: 20),
           TextField(
             controller: _otpController,
-            enabled: !_submitting,
+            enabled: !_submitting && !isLocked,
             autofocus: true,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
@@ -485,11 +531,29 @@ class _OtpConfirmSheetState extends ConsumerState<_OtpConfirmSheet> {
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFFD32F2F)),
           ],
+          if (isLocked) ...[
+            const SizedBox(height: 8),
+            AppText(
+              'Locked for ${lockSeconds}s',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFD32F2F),
+            ),
+          ] else if (throttle.failedAttempts > 0) ...[
+            const SizedBox(height: 8),
+            AppText(
+              '${throttle.attemptsLeft} '
+              '${throttle.attemptsLeft == 1 ? 'attempt' : 'attempts'} remaining',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black54,
+            ),
+          ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _submitting ? null : _submit,
+              onPressed: (_submitting || isLocked) ? null : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryBlue,
                 foregroundColor: Colors.white,
@@ -505,8 +569,11 @@ class _OtpConfirmSheetState extends ConsumerState<_OtpConfirmSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Verify & complete delivery',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  : Text(
+                      isLocked
+                          ? 'Try again in ${lockSeconds}s'
+                          : 'Verify & complete delivery',
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],

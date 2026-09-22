@@ -69,8 +69,11 @@ class AddressModel {
       instructions:
           json['instructions'] ?? json['deliveryInstructions'] ?? '',
       isDefault: json['isDefault'] ?? json['is_default'] ?? false,
-      lat: (json['lat'] ?? json['latitude'] as num?)?.toDouble(),
-      lng: (json['lng'] ?? json['longitude'] as num?)?.toDouble(),
+      // Parsed rather than cast: `as num?` used to bind only to the
+      // right-hand side of the `??`, so a non-numeric `lat` (e.g. a string
+      // from a legacy record) threw instead of degrading to null.
+      lat: _toDouble(json['lat'] ?? json['latitude']),
+      lng: _toDouble(json['lng'] ?? json['longitude']),
     );
   }
 
@@ -122,5 +125,13 @@ class AddressModel {
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
     );
+  }
+
+  /// Coordinates may arrive as a number or as a string; anything else (or
+  /// nothing) yields null rather than throwing during address parsing.
+  static double? _toDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 }

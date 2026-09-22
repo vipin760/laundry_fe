@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../orders/models/order_model.dart';
 import '../../orders/widgets/delivery_confirmation_sheet.dart';
 import '../../orders/widgets/order_payment_sheet.dart';
@@ -137,20 +138,13 @@ const _kPickedUpDesc  = 'You\'ve picked up your order. Thank you for choosing La
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Returns 0-based index into the step list, or -1 for CANCELLED.
-int _statusToIdx(String status) {
-  switch (status) {
-    case 'ORDER_PLACED':     return 0;
-    case 'PICKUP_ASSIGNED':  return 1;
-    case 'ITEMIZED':         return 2;
-    case 'PROCESSING':       return 3;
-    case 'OUT_FOR_DELIVERY': return 4;
-    case 'READY_FOR_PICKUP': return 4;
-    case 'COMPLETED':        return 4;
-    case 'CANCELLED':        return -1;
-    default:                 return 0;
-  }
-}
+/// Returns 0-based index into the step list, or -1 when the status has no
+/// place on the timeline (cancelled, or a status this build doesn't know).
+///
+/// Delegates to [OrderStatusMapper] so this screen can't drift from the rest
+/// of the app's interpretation of the same backend value.
+int _statusToIdx(String status) =>
+    OrderStatusMapper.timelineIndex(OrderStatusMapper.fromApi(status)) ?? -1;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SCREEN
@@ -176,17 +170,42 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
 
   Map<String, dynamic>? _order;
   bool _loading = true;
+
+  /// Set only when there is nothing to show (initial load failed). A failure
+  /// while order data is already on screen surfaces via [_pollError] instead,
+  /// so one bad poll never replaces a working screen.
   String? _error;
+
+  /// Transient "couldn't refresh" banner shown above live order data.
+  String? _pollError;
   Timer? _pollTimer;
 
   bool _paying = false;
   bool _cancelling = false;
   String? _payError;
 
+  /// Order id returned by /payments/initiate — the id the backend expects
+  /// back at verification time.
+  String? _currentOrderId;
+
+  /// Razorpay can deliver the same success callback more than once (e.g. web
+  /// checkout re-emitting on focus). Verified payment ids are remembered so a
+  /// repeat callback is ignored rather than re-posted to /payments/verify.
+  final _verifiedPaymentIds = <String>{};
+  bool _verifying = false;
+
+  /// Parsed form of [_order], computed once per fetch. Parsing here (rather
+  /// than in a getter used by build()) keeps a malformed payload from throwing
+  /// inside the widget tree, which is what turns a bad response into a blank
+  /// screen.
+  OrderModel? _parsedOrder;
+
   @override
   void initState() {
     super.initState();
     _razorpay = AppRazorpay();
+    _razorpay.on(AppRazorpay.EVENT_PAYMENT_SUCCESS, _onPaySuccess);
+    _razorpay.on(AppRazorpay.EVENT_PAYMENT_ERROR, _onPayError);
     _fetch();
     _pollTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _fetch());
@@ -199,38 +218,101 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
     super.dispose();
   }
 
-  OrderModel? get _orderModel =>
-      _order != null ? OrderModel.fromJson(_order!) : null;
+  OrderModel? get _orderModel => _parsedOrder;
 
   // ── Payment ──────────────────────────────────────────────────────────────
 
+  /// Razorpay reports the sheet was dismissed/failed client-side — the order
+  /// stays PENDING (never marked failed here) so the user can just retry.
+  void _onPayError(PaymentFailureResponse r) {
+    if (!mounted) return;
+    setState(() {
+      _paying = false;
+      _payError = r.message ?? 'Payment failed. Please try again.';
+    });
+  }
+
+  /// Only after the backend has verified the Razorpay signature do we treat
+  /// this as a real success — never trust the SDK's success callback alone.
+  Future<void> _onPaySuccess(PaymentSuccessResponse r) async {
+    final orderId = _currentOrderId;
+    final paymentId = r.paymentId;
+    final razorpayOrderId = r.orderId;
+    final signature = r.signature;
+
+    if (orderId == null ||
+        paymentId == null ||
+        razorpayOrderId == null ||
+        signature == null) {
+      if (!mounted) return;
+      setState(() {
+        _paying = false;
+        _payError =
+            'Payment could not be confirmed. If money was debited it will be '
+            'reconciled automatically — please check back shortly.';
+      });
+      return;
+    }
+
+    // Duplicate callback for a payment we already verified — ignore it rather
+    // than posting /payments/verify a second time.
+    if (_verifiedPaymentIds.contains(paymentId) || _verifying) return;
+    _verifying = true;
+
+    try {
+      await _svc.verifyPayment(
+        orderId: orderId,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
+      );
+      _verifiedPaymentIds.add(paymentId);
+      if (!mounted) return;
+      setState(() { _paying = false; _payError = null; });
+
+      // Refresh only once the server has actually confirmed the payment, so
+      // the OTP and updated paymentStatus are real rather than optimistic.
+      await _fetch();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _paying = false;
+        _payError = 'Payment verification failed. Please contact support.';
+      });
+    } finally {
+      _verifying = false;
+    }
+  }
+
   Future<void> _initiateUpiPayment() async {
     final order = _orderModel;
-    if (order == null) return;
+    if (order == null || _paying) return;
     setState(() { _paying = true; _payError = null; });
     try {
       final data = await _svc.initiatePaymentForOrder(orderId: order.id);
+      _currentOrderId = data['orderId']?.toString() ?? order.id;
       final razorpayOrderId = data['razorpayOrderId'] as String? ?? '';
       final amount = (data['amount'] as num?)?.toInt() ?? 0;
+      final user = ref.read(authProvider).user;
 
-      // Open payment via Razorpay
+      // Opening only puts the checkout sheet up; the outcome arrives via
+      // _onPaySuccess/_onPayError, registered in initState(). _paying stays
+      // true until one of those fires so the button can't be tapped again.
       _razorpay.open({
         'key': PaymentConfig.razorpayKeyId,
         'amount': amount,
         'name': 'LaundryBrew',
         'order_id': razorpayOrderId,
         'description': 'Laundry Order #${order.displayNumber}',
-        'prefill': {
-          'contact': '8888888888',
-          'email': 'customer@laundrybrew.com',
-        },
+        'prefill': PaymentConfig.prefillFor(
+          contact: user?.mobileNumber,
+          email: user?.email,
+        ),
       });
-
-      if (!mounted) return;
-      setState(() { _paying = false; _payError = null; });
-      await _fetch();
     } catch (e) {
-      await _svc.markPaymentFailed(widget.orderId);
+      if (_currentOrderId != null) {
+        await _svc.markPaymentFailed(_currentOrderId!);
+      }
       if (!mounted) return;
       final msg = e.toString();
       setState(() {
@@ -327,19 +409,55 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
   Future<void> _fetch() async {
     try {
       final data = await _svc.getOrderTracking(widget.orderId);
-      if (mounted) setState(() { _order = data; _loading = false; });
+      if (!mounted) return;
+      setState(() {
+        _order = data;
+        _parsedOrder = _parseOrder(data);
+        _loading = false;
+        // A successful poll always clears both error states — one transient
+        // failure must not leave the screen stuck on an error view forever.
+        _error = null;
+        _pollError = null;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-          _loading = false;
-        });
-      }
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
+      setState(() {
+        _loading = false;
+        if (_order == null) {
+          // Nothing on screen yet — a full error view with retry is correct.
+          _error = message;
+        } else {
+          // Keep showing the last known good order; surface the failure as a
+          // dismissible banner so status, payment, cancel and OTP stay usable.
+          _pollError = message;
+        }
+      });
     }
   }
 
-  String get _statusKey =>
-      (_order?['status'] as String?) ?? 'ORDER_PLACED';
+  /// Defensive parse: a malformed payload degrades to "details unavailable"
+  /// rather than throwing inside build() and blanking the screen.
+  OrderModel? _parseOrder(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    try {
+      return OrderModel.fromJson(data);
+    } catch (e, stack) {
+      debugPrint('[TrackOrder] could not parse order payload: $e');
+      debugPrintStack(stackTrace: stack);
+      return null;
+    }
+  }
+
+  /// Coerced rather than cast: a non-string value here must not throw during
+  /// build.
+  String get _statusKey {
+    final raw = _order?['status'];
+    if (raw is String && raw.isNotEmpty) return raw;
+    return 'ORDER_PLACED';
+  }
+
+  String get _deliveryOtp => _order?['deliveryOtp']?.toString() ?? '';
   bool get _isCancelled  => _statusKey == 'CANCELLED';
   bool get _isCompleted  => _statusKey == 'COMPLETED';
   bool get _isSelfPickup => _orderModel?.deliveryType == DeliveryType.selfPickup;
@@ -440,7 +558,39 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
               : _order == null
                   ? const _ErrorView(
                       message: 'Order not found.', onRetry: null)
-                  : _buildBody(),
+                  : _buildBodySafely(),
+    );
+  }
+
+  /// Renders the tracking body with a refresh-failure banner on top, and
+  /// degrades to a retryable error view if anything in the payload is shaped
+  /// unexpectedly — so no response can leave the user on a blank screen.
+  Widget _buildBodySafely() {
+    Widget body;
+    try {
+      body = _buildBody();
+    } catch (e, stack) {
+      debugPrint('[TrackOrder] could not render order: $e');
+      debugPrintStack(stackTrace: stack);
+      return _ErrorView(
+        message: 'We could not display this order right now.',
+        onRetry: () {
+          setState(() => _loading = true);
+          _fetch();
+        },
+      );
+    }
+
+    if (_pollError == null) return body;
+
+    return Column(
+      children: [
+        _PollErrorBanner(
+          message: _pollError!,
+          onDismiss: () => setState(() => _pollError = null),
+        ),
+        Expanded(child: body),
+      ],
     );
   }
 
@@ -449,17 +599,28 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
     final steps = _steps;
     final step = idx >= 0 ? steps[idx] : steps[0];
 
+    // A status this build doesn't recognise gets a neutral presentation — it
+    // must not be dressed up as "Order Confirmed", which would contradict the
+    // bill, payment state and OTP shown further down the same screen.
+    final isUnknownStatus =
+        OrderStatusMapper.fromApi(_statusKey) == OrderStatus.unknown;
+
     final heroLabel = _isCompleted
         ? (_isSelfPickup ? _kPickedUpLabel : _kDeliveredLabel)
         : _isCancelled
             ? 'Order Cancelled'
-            : step.label;
+            : isUnknownStatus
+                ? OrderStatusMapper.label(OrderStatus.unknown)
+                : step.label;
 
     final heroDesc = _isCompleted
         ? (_isSelfPickup ? _kPickedUpDesc : _kDeliveredDesc)
         : _isCancelled
             ? 'This order has been cancelled. Please contact support if you need help.'
-            : step.description;
+            : isUnknownStatus
+                ? 'Your order is being processed. Pull to refresh for the '
+                    'latest update.'
+                : step.description;
 
     final heroAsset = _isCompleted || _isCancelled
         ? _kDeliveredAsset
@@ -471,7 +632,9 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
         children: [
           // ── Hero ─────────────────────────────────────────────────────────
           _HeroBanner(
-            stepNumber: _isCompleted ? 6 : (_isCancelled ? 0 : step.number),
+            stepNumber: _isCompleted
+                ? 6
+                : (_isCancelled || isUnknownStatus ? 0 : step.number),
             label: heroLabel,
             description: heroDesc,
             asset: heroAsset,
@@ -484,11 +647,11 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
           if ((_statusKey == 'PROCESSING' ||
                   _statusKey == 'OUT_FOR_DELIVERY' ||
                   _statusKey == 'READY_FOR_PICKUP') &&
-              (_order!['deliveryOtp'] as String?)?.isNotEmpty == true)
+              _deliveryOtp.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
               child: _OtpDisplayCard(
-                otp: _order!['deliveryOtp'] as String,
+                otp: _deliveryOtp,
                 isSelfPickup: _isSelfPickup,
               ),
             ),
@@ -1473,6 +1636,52 @@ class _OtpDisplayCard extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 // ERROR VIEW
 // ══════════════════════════════════════════════════════════════════════════════
+
+/// Non-blocking "couldn't refresh" strip shown above live order data when a
+/// poll fails. The order stays fully visible and interactive underneath.
+class _PollErrorBanner extends StatelessWidget {
+  const _PollErrorBanner({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _kOrangeBg,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+          child: Row(
+            children: [
+              const Icon(Icons.wifi_off_rounded, size: 18, color: _kOrange),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8A5A00),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onDismiss,
+                iconSize: 18,
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Dismiss',
+                icon: const Icon(Icons.close_rounded, color: _kOrange),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});

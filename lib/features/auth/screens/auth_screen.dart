@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../referral/data/referral_api.dart';
+import '../../referral/services/referral_deeplink_service.dart';
 
 import '../providers/auth_provider.dart';
 import '../../../core/router/app_routes.dart';
@@ -12,6 +15,10 @@ import '../../../core/router/app_routes.dart';
 // ── Primary brand colour ────────────────────────────────────────────────────
 const _kPrimary = Color(0xFF1A23CC);
 const _kPrimaryDark = Color(0xFF0F1899);
+
+/// How long the user must wait between OTP requests. Client-side pacing only —
+/// Firebase enforces its own server-side limits on top of this.
+const _kResendCooldownSeconds = 30;
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -33,6 +40,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       List.generate(6, (_) => FocusNode());
 
   bool _agreedToTerms = false;
+
+  /// True while a send-OTP or verify-OTP request is in flight.
+  bool _submitting = false;
+
+  /// Seconds left before another OTP may be requested; 0 means "resend now".
+  int _resendSeconds = 0;
+  bool _resending = false;
+  Timer? _resendTimer;
+
   late final TapGestureRecognizer _termsTapRecognizer =
       TapGestureRecognizer()..onTap = () => context.push(AppRoutes.terms);
   late final TapGestureRecognizer _privacyTapRecognizer =
@@ -49,7 +65,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _otpControllers[i].text = i < digits.length ? digits[i] : '';
     }
     setState(() {});
-    if (_otpValue.length == 6) {
+    if (_otpValue.length == 6 && !_submitting) {
       FocusScope.of(context).unfocus();
       _submit();
     }
@@ -62,10 +78,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     // (via _AuthChangeNotifier + refreshListenable in app_router.dart).
     // Do NOT call _goHome() here — it races with the redirect and can cause
     // the app to stay stuck on the auth screen.
+    _prefillReferralCode();
+  }
+
+  /// Pre-fills the referral field from a code captured off the launch URL.
+  ///
+  /// Only pre-fills — the code is still applied by the user's own submit, and
+  /// anything they've already typed wins.
+  Future<void> _prefillReferralCode() async {
+    final pending = await ReferralDeepLinkService.pendingCode();
+    if (!mounted || pending == null) return;
+    if (_referralCodeController.text.trim().isNotEmpty) return;
+    setState(() => _referralCodeController.text = pending);
   }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _mobileController.dispose();
     _nameController.dispose();
     _referralCodeController.dispose();
@@ -90,7 +119,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _otpFocusNodes[index + 1].requestFocus();
     }
     // Auto-submit when all 6 filled
-    if (_otpValue.length == 6) {
+    if (_otpValue.length == 6 && !_submitting) {
       FocusScope.of(context).unfocus();
       _submit();
     }
@@ -113,7 +142,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     setState(() {});
   }
 
+  /// Serialises submits so a verification can't be started twice.
+  ///
+  /// The OTP boxes auto-submit the moment six digits are present, and that
+  /// call site can fire again while the first request is still running (the
+  /// user retypes a digit because nothing looks like it happened). The second
+  /// attempt reuses the same verificationId and code, Firebase rejects the
+  /// already-consumed credential, and the user is left sitting on the OTP
+  /// screen as if their code was wrong.
   Future<void> _submit() async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await _performSubmit();
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _performSubmit() async {
     if (!_agreedToTerms) return;
     final authState = ref.read(authProvider);
     // For OTP phase, validate boxes directly instead of form validator
@@ -131,6 +178,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           .sendMobileOtp(mobileNumber);
 
       if (success && mounted) {
+        _startResendCooldown();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('OTP sent. Please check your SMS.'),
@@ -157,6 +205,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       try {
         await const ReferralApi().apply(_referralCodeController.text.trim());
         debugPrint('✓ Referral code applied');
+
+        // Applied — drop any captured deep-link code so it can't be
+        // re-suggested on a future signup.
+        await ReferralDeepLinkService.clear();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -201,10 +253,56 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _changeNumber() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = 0);
     ref.read(authProvider.notifier).resetOtpFlow();
     _nameController.clear();
     _referralCodeController.clear();
     _clearOtp();
+  }
+
+  /// Blocks repeat sends for [seconds] after a code goes out.
+  void _startResendCooldown([int seconds = _kResendCooldownSeconds]) {
+    _resendTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _resendSeconds = seconds);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _resendSeconds--);
+      if (_resendSeconds <= 0) timer.cancel();
+    });
+  }
+
+  /// Sends a fresh code to the same number.
+  ///
+  /// Unlike [_changeNumber] this keeps the entered name and referral code —
+  /// the user is still part-way through the same signup, they just need
+  /// another SMS.
+  Future<void> _resendOtp() async {
+    if (_resendSeconds > 0 || _resending) return;
+
+    setState(() => _resending = true);
+    final mobileNumber = _mobileController.text.trim();
+    await ref.read(authProvider.notifier).sendMobileOtp(mobileNumber);
+    if (!mounted) return;
+
+    setState(() => _resending = false);
+
+    // Only start the cooldown when a code actually went out, so a failed
+    // send doesn't lock the user out of retrying.
+    final failed = ref.read(authProvider).error != null;
+    if (failed) return;
+
+    _startResendCooldown();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('A new OTP has been sent.'),
+        backgroundColor: _kPrimary,
+      ),
+    );
   }
 
   @override
@@ -623,27 +721,66 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                       ],
 
-                      // ── Change number link (shown after OTP sent) ─────────
+                      // ── Resend + change number (shown after OTP sent) ─────
                       if (authState.isOtpSent)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: authState.isLoading ? null : _changeNumber,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 4, horizontal: 0),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'Change number?',
-                              style: TextStyle(
-                                color: _kPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Resend keeps the number, name and referral code
+                            // the user already entered — only _changeNumber
+                            // starts the form over.
+                            if (_resendSeconds > 0)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Text(
+                                  'Resend OTP in ${_resendSeconds}s',
+                                  style: const TextStyle(
+                                    color: Color(0xFF6B7280),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              )
+                            else
+                              TextButton(
+                                onPressed: (authState.isLoading || _resending)
+                                    ? null
+                                    : _resendOtp,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 4, horizontal: 0),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  _resending ? 'Sending…' : 'Resend OTP',
+                                  style: const TextStyle(
+                                    color: _kPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            TextButton(
+                              onPressed:
+                                  authState.isLoading ? null : _changeNumber,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 4, horizontal: 0),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                'Change number?',
+                                style: TextStyle(
+                                  color: _kPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
 
                       const SizedBox(height: 14),

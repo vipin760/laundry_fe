@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
@@ -139,33 +140,74 @@ class CartNotifier extends Notifier<CartState> {
           (data != null && data['items'] != null) ? data['items'] as List : [];
 
       final nextItems = <String, CartLineItem>{};
+      var skipped = 0;
+
+      // Parsed per item: one malformed/legacy line must not empty the whole
+      // cart, which would look to the user like their items silently vanished.
       for (final item in serverItems) {
-        final serviceId = item['serviceId'].toString();
-        final category = (item['category'] as String?) ?? 'instant';
-        final key = cartItemKey(serviceId, category);
-        nextItems[key] = CartLineItem(
-          service: ServiceModel(
-            id: serviceId,
-            name: item['serviceNameSnapshot'] ?? '',
-            price: (item['unitPriceSnapshot'] as num).toDouble(),
-            instantDescription: '',
-            scheduledDescription: '',
-            instantOrderPlacedMessage: '',
-            scheduledOrderPlacedMessage: '',
-            turnaroundHours: (item['turnaroundHoursSnapshot'] as num?)?.toInt() ?? 24,
-            instantTurnaroundMinutes:
-                (item['instantTurnaroundMinutesSnapshot'] as num?)?.toInt() ?? 90,
-          ),
-          quantity: (item['quantity'] as num).toInt(),
-          category: category,
-        );
+        try {
+          final line = _lineItemFromJson(item as Map<String, dynamic>);
+          nextItems[cartItemKey(line.service.id, line.category)] = line;
+        } catch (e) {
+          skipped++;
+          debugPrint('[cartProvider] skipping unreadable cart item: $e');
+        }
       }
 
-      state = state.copyWith(items: nextItems, isLoading: false);
-    } catch (_) {
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(
+        items: nextItems,
+        isLoading: false,
+        clearError: skipped == 0,
+        errorMessage: skipped > 0
+            ? 'Some items could not be loaded. Please refresh your cart.'
+            : null,
+      );
+    } catch (e) {
+      debugPrint('[cartProvider] could not load cart: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Could not load your cart. Please try again.',
+      );
     }
   }
+
+  CartLineItem _lineItemFromJson(Map<String, dynamic> item) {
+    final serviceId = item['serviceId'].toString();
+    final category = (item['category'] as String?) ?? 'instant';
+    return CartLineItem(
+      service: ServiceModel(
+        id: serviceId,
+        name: item['serviceNameSnapshot'] ?? '',
+        price: (item['unitPriceSnapshot'] as num).toDouble(),
+        instantDescription: '',
+        scheduledDescription: '',
+        instantOrderPlacedMessage: '',
+        scheduledOrderPlacedMessage: '',
+        turnaroundHours: (item['turnaroundHoursSnapshot'] as num?)?.toInt() ?? 24,
+        instantTurnaroundMinutes:
+            (item['instantTurnaroundMinutesSnapshot'] as num?)?.toInt() ?? 90,
+      ),
+      quantity: (item['quantity'] as num).toInt(),
+      category: category,
+    );
+  }
+
+  /// Puts a single line back the way it was before an optimistic change that
+  /// the server then rejected. Only the affected key is restored — rebuilding
+  /// from a whole-map snapshot would clobber unrelated changes made while the
+  /// request was in flight.
+  void _rollbackItem(String key, CartLineItem? previous, String message) {
+    final restored = Map<String, CartLineItem>.from(state.items);
+    if (previous == null) {
+      restored.remove(key);
+    } else {
+      restored[key] = previous;
+    }
+    state = state.copyWith(items: restored, errorMessage: message);
+  }
+
+  static const _syncFailureMessage =
+      'Could not update your cart. Please check your connection and try again.';
 
   /// Returns false (and sets [CartState.errorMessage]) when the add would mix
   /// Instant and Scheduled services — only one type is allowed per order.
@@ -192,8 +234,12 @@ class CartNotifier extends Notifier<CartState> {
         '/cart/items',
         data: {'serviceId': service.id, 'quantity': 1, 'category': category},
       );
-    } catch (_) {
-      state = state.copyWith(errorMessage: 'Failed to sync with server');
+    } catch (e) {
+      // The server never took the item — undo the optimistic add so the cart
+      // on screen matches the cart checkout will actually read.
+      debugPrint('[cartProvider] add failed, rolling back: $e');
+      _rollbackItem(key, null, _syncFailureMessage);
+      return false;
     } finally {
       _markSettled(key);
     }
@@ -239,8 +285,11 @@ class CartNotifier extends Notifier<CartState> {
           data: {'serviceId': serviceId, 'quantity': -1, 'category': category},
         );
       }
-    } catch (_) {
-      state = state.copyWith(errorMessage: 'Failed to sync with server');
+    } catch (e) {
+      // Restore the original quantity — leaving the UI showing a decrement the
+      // server rejected would ship an order the customer didn't agree to.
+      debugPrint('[cartProvider] decrement/remove failed, rolling back: $e');
+      _rollbackItem(key, existing, _syncFailureMessage);
     } finally {
       _markSettled(key);
     }
@@ -248,7 +297,8 @@ class CartNotifier extends Notifier<CartState> {
 
   Future<void> removeFromCart(String serviceId, String category) async {
     final key = cartItemKey(serviceId, category);
-    if (!state.items.containsKey(key)) return;
+    final existing = state.items[key];
+    if (existing == null) return;
 
     final nextItems = Map<String, CartLineItem>.from(state.items)..remove(key);
     _setPending(key);
@@ -259,11 +309,22 @@ class CartNotifier extends Notifier<CartState> {
         '/cart/items/$serviceId',
         queryParameters: {'category': category},
       );
-    } catch (_) {
-      state = state.copyWith(errorMessage: 'Failed to sync with server');
+    } catch (e) {
+      // Put the item back: it is still in the server's cart, and hiding that
+      // would let a "removed" item ship with the order.
+      debugPrint('[cartProvider] remove failed, rolling back: $e');
+      _rollbackItem(key, existing, _syncFailureMessage);
     } finally {
       _markSettled(key);
     }
+  }
+
+  /// Clears the current error once the UI has shown it, so that hitting the
+  /// same failure twice in a row is reported twice rather than swallowed as
+  /// "no change".
+  void acknowledgeError() {
+    if (state.errorMessage == null) return;
+    state = state.copyWith(clearError: true);
   }
 
   /// Clears in-memory cart and any legacy local cache. Called on logout.

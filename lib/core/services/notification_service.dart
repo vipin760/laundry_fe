@@ -505,6 +505,36 @@ class NotificationService {
     }
   }
 
+  /// Current permission status as the OS reports it *right now*.
+  ///
+  /// Distinct from [getPermissionStatus], which returns the value cached when
+  /// we last asked: the user can grant or revoke notifications in system
+  /// settings at any time, so anything that displays this state has to read
+  /// through to the platform or it will show a stale answer.
+  ///
+  /// Falls back to the cached value if Firebase is unavailable, so a UI built
+  /// on this never fails outright.
+  Future<PermissionStatus> getLivePermissionStatus() async {
+    try {
+      final settings =
+          await FirebaseMessaging.instance.getNotificationSettings();
+      final authStatus = settings.authorizationStatus;
+      if (authStatus == AuthorizationStatus.authorized) {
+        return PermissionStatus.granted;
+      }
+      if (authStatus == AuthorizationStatus.provisional) {
+        return PermissionStatus.provisional;
+      }
+      if (authStatus == AuthorizationStatus.denied) {
+        return PermissionStatus.denied;
+      }
+      return PermissionStatus.notRequested;
+    } catch (e) {
+      debugPrint('[NotificationService] live permission read failed: $e');
+      return getPermissionStatus();
+    }
+  }
+
   /// Get current permission status from storage.
   Future<PermissionStatus> getPermissionStatus() async {
     try {
