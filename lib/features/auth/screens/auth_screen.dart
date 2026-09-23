@@ -334,6 +334,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     // After a successful sign-in, _performSubmit() leaves this screen via
     // _leaveAuthScreen(). The GoRouter redirect only covers the case where
     // login was reached with `go` (it can't see pushed pages).
+    //
+    // Signed in but not yet navigated away (referral apply still running):
+    // the OTP flow has been reset by then, so rendering the form would flash
+    // the phone-number step with a live "Send OTP" button.
+    if (authState.isAuthenticated) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: _kPrimary)),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,

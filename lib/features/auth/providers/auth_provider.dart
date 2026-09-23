@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -405,6 +406,13 @@ class AuthNotifier extends Notifier<AuthState> {
     );
     debugPrint('[AUTH] State Updated after save: isAuthenticated=${state.isAuthenticated}, isInitialized=${state.isInitialized}');
 
+    // Not awaited: the permission prompt and token registration (with its
+    // retries) would otherwise hold the caller — and the login screen — for
+    // seconds after the user is already signed in.
+    unawaited(_registerPushNotifications());
+  }
+
+  Future<void> _registerPushNotifications() async {
     // Register FCM token so this device receives push notifications.
     // No-op until Firebase is configured (see NotificationService).
     await NotificationService.instance.requestPermissionAndRegister(ApiClient.instance);
