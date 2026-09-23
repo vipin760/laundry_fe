@@ -238,7 +238,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
     }
 
-    if (mounted) _leaveAuthScreen();
+    if (mounted) await _leaveAuthScreen();
   }
 
   /// Leaves the login screen after a successful sign-in.
@@ -248,7 +248,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   /// keeps the underlying location (e.g. /home) for pushed pages, so the
   /// redirect sees an authenticated user on /home and leaves this screen on
   /// top of the stack.
-  void _leaveAuthScreen() {
+  Future<void> _leaveAuthScreen() async {
+    // The sign-in state change also triggers a GoRouter refresh, which
+    // re-applies the route stack asynchronously. Navigating before that
+    // settles gets overwritten by it: the stale stack brings back a fresh
+    // AuthScreen, which (already signed in) sits on its spinner forever.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
     final isPartner = ref.read(authProvider).user?.isDeliveryPartner ?? false;
     if (isPartner) {
       context.go(AppRoutes.deliveryPartnerHome);
