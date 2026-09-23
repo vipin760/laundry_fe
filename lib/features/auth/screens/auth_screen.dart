@@ -195,7 +195,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         .read(authProvider.notifier)
         .verifyMobileOtp(mobileNumber, _otpValue.trim(), name: name);
 
-    if (!mounted) return;
+    // Verification failed — the error is already in authState; stay here.
+    if (!mounted || !ref.read(authProvider).isAuthenticated) return;
 
     // ✅ PHASE 3: Handle referral code for new users ONLY.
     // Uses the shared authenticated ApiClient (POST /referral/apply).
@@ -235,6 +236,26 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           );
         }
       }
+    }
+
+    if (mounted) _leaveAuthScreen();
+  }
+
+  /// Leaves the login screen after a successful sign-in.
+  ///
+  /// The router's redirect can't do this when login was opened with
+  /// `context.push` from a guest screen (Home, Services, Pickup): go_router
+  /// keeps the underlying location (e.g. /home) for pushed pages, so the
+  /// redirect sees an authenticated user on /home and leaves this screen on
+  /// top of the stack.
+  void _leaveAuthScreen() {
+    final isPartner = ref.read(authProvider).user?.isDeliveryPartner ?? false;
+    if (isPartner) {
+      context.go(AppRoutes.deliveryPartnerHome);
+    } else if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.home);
     }
   }
 
@@ -310,9 +331,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final authState = ref.watch(authProvider);
     final screenHeight = MediaQuery.of(context).size.height;
 
-    // Navigation is handled by GoRouter's redirect (app_router.dart).
-    // When isAuthenticated becomes true, _AuthChangeNotifier fires
-    // notifyListeners() → GoRouter re-evaluates redirect → navigates to /home.
+    // After a successful sign-in, _performSubmit() leaves this screen via
+    // _leaveAuthScreen(). The GoRouter redirect only covers the case where
+    // login was reached with `go` (it can't see pushed pages).
 
     return Scaffold(
       backgroundColor: Colors.white,
