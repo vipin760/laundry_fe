@@ -1,0 +1,72 @@
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        certificates:
+          - laundrybrew_distribution_p12
+        provisioning_profiles:
+          - Laundrybrew App Store
+      groups:
+        - ios_secrets
+      vars:
+        APP_STORE_APPLE_ID: "6799244954"
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Set Google Maps iOS key
+        script: |
+          # google_maps_flutter isn't wired into any screen yet, so this key is
+          # inert (see Info.plist comment). Only overrides the committed
+          # placeholder when a real key is present in Codemagic's ios_secrets
+          # group — never fails the build over it.
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "GOOGLE_MAPS_API_KEY not set in Codemagic group ios_secrets — keeping placeholder in Info.plist (Maps isn't wired up)."
+          else
+            /usr/libexec/PlistBuddy -c "Set :GMSApiKey $GOOGLE_MAPS_API_KEY" ios/Runner/Info.plist
+          fi
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      - name: Install pods
+        script: |
+          pod install --project-directory=ios
+      - name: Flutter analyze
+        script: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+        ignore_failure: true
+      - name: Flutter unit tests
+        script: |
+          flutter test
+        ignore_failure: true
+      - name: Flutter build ipa
+        script: |
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          if ! [[ "$LATEST_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Failed to fetch a valid latest TestFlight build number (got: '$LATEST_BUILD_NUMBER')"
+            exit 1
+          fi
+          BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          echo "Using CFBundleVersion (build number): $BUILD_NUMBER"
+          flutter build ipa --release \
+            --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY \
+            --build-name=1.0.0 \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

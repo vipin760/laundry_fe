@@ -69,8 +69,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     _mobileController.dispose();
     _nameController.dispose();
     _referralCodeController.dispose();
-    for (final c in _otpControllers) c.dispose();
-    for (final f in _otpFocusNodes) f.dispose();
+    for (final c in _otpControllers) {
+      c.dispose();
+    }
+    for (final f in _otpFocusNodes) {
+      f.dispose();
+    }
     _termsTapRecognizer.dispose();
     _privacyTapRecognizer.dispose();
     super.dispose();
@@ -103,7 +107,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _clearOtp() {
-    for (final c in _otpControllers) c.clear();
+    for (final c in _otpControllers) {
+      c.clear();
+    }
     setState(() {});
   }
 
@@ -287,7 +293,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           prefixIcon: GestureDetector(
                             onTap: () {}, // country picker placeholder
                             child: Container(
-                              width: 78,
+                              width: 96,
                               padding: const EdgeInsets.only(left: 16, right: 8),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -395,9 +401,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2453FF).withOpacity(0.05),
+                              color: const Color(0xFF2453FF).withValues(alpha: 0.05),
                               border: Border.all(
-                                color: const Color(0xFF2453FF).withOpacity(0.2),
+                                color: const Color(0xFF2453FF).withValues(alpha: 0.2),
                               ),
                               borderRadius: BorderRadius.circular(8),
                             ),

@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +10,6 @@ import 'track_order_screen.dart';
 const _kBlue  = Color(0xFF0137B5);
 const _kDark  = Color(0xFF0A1645);
 const _kGrey  = Color(0xFF6B7280);
-const _kGreen = Color(0xFF22C55E);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // ORDER SUCCESS SCREEN

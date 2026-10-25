@@ -20,16 +20,6 @@ const _kBg     = Color(0xFFF4F6FB);
 const _kGreen  = Color(0xFF15803D);
 const _kGreenBg= Color(0xFFDCF5E8);
 
-// ── Payment icons ─────────────────────────────────────────────────────────────
-const _payIcons = {
-  'upi'         : Icons.phone_android_rounded,
-  'credit_card' : Icons.credit_card_rounded,
-  'debit_card'  : Icons.credit_card_rounded,
-  'net_banking' : Icons.account_balance_rounded,
-  'wallet'      : Icons.account_balance_wallet_rounded,
-  'cash_on_delivery': Icons.payments_rounded,
-};
-
 // ═════════════════════════════════════════════════════════════════════════════
 class SchedulingScreen extends ConsumerStatefulWidget {
   const SchedulingScreen({super.key});
@@ -61,14 +51,13 @@ class _SchedulingScreenState extends ConsumerState<SchedulingScreen> {
   CheckoutShop?       _selectedShop;
   CheckoutSlot?       _pickupSlot;
   CheckoutSlot?       _deliverySlot;
-  CheckoutPaymentMethod _payMethod = CheckoutPaymentMethod.cashOnDelivery;
+  final CheckoutPaymentMethod _payMethod = CheckoutPaymentMethod.cashOnDelivery;
   List<CheckoutShop>  _shops = [];
   bool   _loadingOptions = false;
   String? _optionsError;
 
   // Standard time slots from the admin-managed API
   List<CheckoutSlot> _standardPickupSlots  = [];
-  List<CheckoutSlot> _standardDeliverySlots = [];
   bool _loadingStandardSlots = false;
 
   String get _today => DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -104,7 +93,6 @@ class _SchedulingScreenState extends ConsumerState<SchedulingScreen> {
             items.isNotEmpty && items.every((i) => i.category == 'instant');
         setState(() {
           _standardPickupSlots   = result.pickupSlots;
-          _standardDeliverySlots = result.deliverySlots;
           if (allInstant) {
             // Auto-select the Instant slot so no user action is needed. Don't
             // fall back to a scheduled slot when Instant isn't in the list —
@@ -1131,128 +1119,6 @@ class _StandardSlotCard extends StatelessWidget {
     );
   }
 }
-
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _SlotPicker extends StatelessWidget {
-  const _SlotPicker({required this.slots, required this.selected, required this.onSelect});
-  final List<CheckoutSlot> slots;
-  final CheckoutSlot? selected;
-  final ValueChanged<CheckoutSlot> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    if (slots.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: _cardDeco(),
-        child: const Text('No slots available', style: TextStyle(color: _kGrey)),
-      );
-    }
-    return SizedBox(
-      height: 68,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: slots.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) {
-          final slot = slots[i];
-          final active = selected?.label == slot.label;
-          return GestureDetector(
-            onTap: () => onSelect(slot),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: active ? _kBlue : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: active ? _kBlue : const Color(0xFFE5E7EB),
-                    width: active ? 1.5 : 1),
-                boxShadow: active ? [
-                  BoxShadow(color: _kBlue.withAlpha(50), blurRadius: 8, offset: const Offset(0, 3))
-                ] : [],
-              ),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(slot.label,
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w800,
-                        color: active ? Colors.white : _kDark)),
-                const SizedBox(height: 3),
-                Text('${slot.startTime} – ${slot.endTime}',
-                    style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w500,
-                        color: active ? Colors.white.withAlpha(200) : _kGrey)),
-              ]),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// PAYMENT METHOD PICKER
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _PaymentMethodPicker extends StatelessWidget {
-  const _PaymentMethodPicker({
-    required this.methods, required this.selected, required this.onSelect});
-  final List<CheckoutPaymentMethod> methods;
-  final CheckoutPaymentMethod? selected;
-  final ValueChanged<CheckoutPaymentMethod> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: _cardDeco(),
-      child: Column(children: [
-        ...methods.asMap().entries.map((e) {
-          final m = e.value;
-          final sel = selected == m;
-          final isLast = e.key == methods.length - 1;
-          final icon = _payIcons[m.apiValue] ?? Icons.payment_rounded;
-          return Column(children: [
-            GestureDetector(
-              onTap: () => onSelect(m),
-              child: Container(
-                color: Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                child: Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: sel ? _kBlue : _kBlueBg,
-                      borderRadius: BorderRadius.circular(9)),
-                    child: Icon(icon, size: 18, color: sel ? Colors.white : _kBlue),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(m.label,
-                      style: TextStyle(fontWeight: FontWeight.w700,
-                          color: sel ? _kBlue : _kDark))),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: 20, height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: sel ? _kBlue : const Color(0xFFD1D5DB),
-                          width: sel ? 6 : 2),
-                    ),
-                  ),
-                ]),
-              ),
-            ),
-            if (!isLast) const Divider(height: 1, indent: 14, endIndent: 14,
-                color: Color(0xFFF3F4F6)),
-          ]);
-        }),
-      ]),
-    );
-  }
-}
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 // RECEPTION FORM

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -9,14 +9,31 @@
 	<string>LaundryBrew needs your location to set the pickup &amp; delivery address.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>LaundryBrew needs your location to set the pickup &amp; delivery address.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>LaundryBrew needs your location to set the pickup &amp; delivery address.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>LaundryBrew needs camera access to attach order photos and support images.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>LaundryBrew needs photo library access to attach order photos and support images.</string>
 	<!-- Push notification permissions -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<!-- Replace YOUR_GOOGLE_MAPS_API_KEY with your actual key from Google Cloud Console -->
+	<!-- google_maps_flutter is an unwired dependency (MapPickerScreen is never
+	     navigated to, and GMSServices.provideAPIKey is never called), so this
+	     value is inert — it just needs to be non-empty for CocoaPods/CI. Set
+	     GOOGLE_MAPS_API_KEY in Codemagic's ios_secrets group to override with
+	     a real key if the map picker ever gets wired up. -->
 	<key>GMSApiKey</key>
-	<string>YOUR_GOOGLE_MAPS_API_KEY</string>
+	<string>UNUSED-MAPS-KEY-NOT-WIRED-UP</string>
+	<!-- Export compliance: app only uses HTTPS/TLS (OS-provided) for API
+	     calls and standard encryption from Firebase/Razorpay SDKs for auth
+	     and payments — no proprietary/custom encryption. Declaring this
+	     lets App Store Connect auto-determine compliance for every build,
+	     instead of requiring a manual answer per upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -78,6 +95,23 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Firebase Phone Auth reCAPTCHA verification fallback (used when
+	     silent APNs push verification is unavailable or still propagating
+	     after enabling the Push Notifications capability). Scheme must be
+	     this app's Encoded App ID from Firebase Console, Project Settings,
+	     General, Your apps. Not REVERSED_CLIENT_ID, which is for
+	     Google Sign-In, a separate feature this app does not use. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-720667706724-ios-e0034bcb272036d671a671</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

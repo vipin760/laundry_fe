@@ -166,7 +166,7 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         itemCount: _predictions.length,
-                        separatorBuilder: (_, __) =>
+                        separatorBuilder: (_, _) =>
                             const Divider(height: 1, color: Color(0xFFF3F4F6)),
                         itemBuilder: (_, i) {
                           final p = _predictions[i];

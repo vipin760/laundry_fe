@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +17,9 @@ import '../../profile/screens/addresses_screen.dart';
 import '../../profile/screens/my_information_screen.dart';
 import '../../referral/screens/refer_earn_home_screen.dart';
 import '../../account_deletion/screens/privacy_security_screen.dart';
+import '../../account_deletion/screens/delete_account_screen.dart';
+import '../../account_deletion/providers/delete_account_provider.dart';
+import '../../account_deletion/models/delete_account_models.dart';
 import '../../notifications/providers/notifications_provider.dart';
 import '../../notifications/screens/notifications_screen.dart';
 import '../../services/models/service_model.dart';
@@ -35,8 +41,69 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   int _tab = 0;
+
+  // ── iOS: auto-logout when an admin approves the deletion request ───────────
+  // The account isn't touched when the user *submits* the request — deletion
+  // happens later, on admin approval. This watches the backend deletion status
+  // and, the moment it flips to "deleted", forces a local logout and sends the
+  // user back to the login screen. Backend is the source of truth; the poll +
+  // resume-refresh just make it prompt without the user having to trigger an
+  // API call themselves (the global 401 interceptor is the ultimate fallback).
+  Timer? _deletionPoll;
+  bool _handlingAccountDeleted = false;
+
+  bool get _iosDeletionWatch =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_iosDeletionWatch) WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _deletionPoll?.cancel();
+    if (_iosDeletionWatch) WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // An admin approval usually lands while the app is backgrounded — re-check
+    // the deletion status the moment the user returns.
+    if (state == AppLifecycleState.resumed && _iosDeletionWatch && mounted) {
+      ref.invalidate(deleteRequestStatusProvider);
+    }
+  }
+
+  /// Keep a light poll running only while a deletion request is pending.
+  void _syncDeletionPoll(bool pending) {
+    if (pending && _deletionPoll == null) {
+      _deletionPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+        if (mounted) ref.invalidate(deleteRequestStatusProvider);
+      });
+    } else if (!pending && _deletionPoll != null) {
+      _deletionPoll!.cancel();
+      _deletionPoll = null;
+    }
+  }
+
+  Future<void> _onAccountDeleted() async {
+    if (_handlingAccountDeleted || !mounted) return;
+    _handlingAccountDeleted = true;
+    _deletionPoll?.cancel();
+    _deletionPoll = null;
+    // Clear the local session (skips the /auth/logout call, which would 401).
+    // Home is guest-accessible, so drop back to the Home tab rather than the
+    // login screen — landing on /auth/login here would be a dead end (it has
+    // no back button/affordance since it no longer needs one to be reachable).
+    await ref.read(authProvider.notifier).forceLogout();
+    if (mounted) setState(() => _tab = 0);
+  }
 
   // ── Bottom nav items ───────────────────────────────────────────────────────
   static const _navItems = [
@@ -46,8 +113,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _NavItem(label: 'Profile',  selected: Icons.person_rounded,                 unselected: Icons.person_outline_rounded),
   ];
 
+  // Guest (no user) or an authenticated user with no name on file both fall
+  // back to a neutral "User" — never a hardcoded/placeholder customer name.
   String _firstName(String? name) {
-    if (name == null || name.trim().isEmpty) return 'Rohan';
+    if (name == null || name.trim().isEmpty) return 'User';
     return name.trim().split(' ').first;
   }
 
@@ -70,14 +139,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (ok == true) {
       ref.invalidate(walletProvider);
       await ref.read(authProvider.notifier).logout();
-      if (mounted) context.go(AppRoutes.login);
+      // Home is guest-accessible, so drop back to the Home tab rather than
+      // the login screen — landing on /auth/login here would be a dead end
+      // (it has no back button/affordance since it no longer needs one to
+      // be reachable).
+      if (mounted) setState(() => _tab = 0);
     }
+  }
+
+  // Payments (index 2) and Profile (index 3) are account-based — Home and
+  // Price (indices 0/1) are guest-browsable per App Store Guideline 5.1.1(v).
+  // A guest tapping either sends them to login instead of switching tabs;
+  // an authenticated user's navigation is unchanged.
+  void _onNavTap(int i) {
+    final isAccountTab = i == 2 || i == 3;
+    if (isAccountTab && !ref.read(authProvider).isAuthenticated) {
+      context.push(AppRoutes.login);
+      return;
+    }
+    setState(() => _tab = i);
   }
 
   @override
   Widget build(BuildContext context) {
     final user      = ref.watch(authProvider).user;
     final firstName = _firstName(user?.name);
+
+    // iOS: react to the backend deletion status changing under us.
+    if (_iosDeletionWatch) {
+      ref.listen<AsyncValue<DeleteRequestStatusResult>>(
+        deleteRequestStatusProvider,
+        (_, next) {
+          final s = next.whenOrNull(data: (v) => v);
+          if (s == null) return;
+          if (s.isDeleted) {
+            _onAccountDeleted();
+          } else {
+            _syncDeletionPoll(s.isPendingApproval);
+          }
+        },
+      );
+    }
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -95,7 +197,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: _BottomNav(
         items: _navItems,
         current: _tab,
-        onTap: (i) => setState(() => _tab = i),
+        onTap: _onNavTap,
       ),
     );
   }
@@ -1043,7 +1145,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 trailing: Switch.adaptive(
                   value: _notificationsEnabled,
                   onChanged: _onNotificationToggle,
-                  activeColor: _kPrimary,
+                  activeThumbColor: _kPrimary,
                 ),
                 onTap: null,
               ),
@@ -1063,6 +1165,17 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ],
           ),
+
+          // iOS app only: surface "Delete Account" directly in the Profile
+          // section so an App Store reviewer finds it immediately (Guideline
+          // 5.1.1(v)). Its own card (like Logout) so the shared menu group is
+          // untouched. Label/subtitle reflect the backend deletion-request
+          // status. Android and Web are unchanged — they reach the existing
+          // flow via Privacy & Security above.
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+            const SizedBox(height: 12),
+            const _DeleteAccountTile(),
+          ],
 
           const SizedBox(height: 20),
 
@@ -1087,6 +1200,45 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// iOS-only Profile entry for account deletion. Its label/subtitle are driven
+/// by the backend deletion-request status (deleteRequestStatusProvider), so the
+/// "Deletion Pending" state survives app restarts, re-login and device changes
+/// and is never inferred from local state alone.
+class _DeleteAccountTile extends ConsumerWidget {
+  const _DeleteAccountTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(deleteRequestStatusProvider).maybeWhen(
+          data: (s) => s.isPendingApproval,
+          orElse: () => false,
+        );
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Color(0x060A1645), blurRadius: 8, offset: Offset(0, 2))],
+      ),
+      child: _ProfileMenuItem(
+        icon: pending ? Icons.hourglass_bottom_rounded : Icons.delete_forever_outlined,
+        iconBg: const Color(0xFFFDECEC),
+        iconColor: const Color(0xFFD92D20),
+        label: pending ? 'Deletion Pending' : 'Delete Account',
+        subtitle: pending
+            ? 'Your deletion request is awaiting approval'
+            : 'Permanently delete your account',
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
+          );
+          ref.invalidate(deleteRequestStatusProvider);
+        },
       ),
     );
   }
@@ -1151,7 +1303,7 @@ class _ProfileAvatar extends StatelessWidget {
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Center(
+                errorBuilder: (_, _, _) => Center(
                   child: Text(
                     initials,
                     style: TextStyle(
@@ -1185,6 +1337,7 @@ class _ProfileMenuItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.trailing,
+    this.subtitle,
   });
   final IconData icon;
   final Color iconBg;
@@ -1192,6 +1345,7 @@ class _ProfileMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final Widget? trailing;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1210,8 +1364,19 @@ class _ProfileMenuItem extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(label,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A2340))),
+              child: subtitle == null
+                  ? Text(label,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A2340)))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A2340))),
+                        const SizedBox(height: 2),
+                        Text(subtitle!,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF7D86A5))),
+                      ],
+                    ),
             ),
             trailing ?? const Icon(Icons.chevron_right_rounded, color: Color(0xFFB0BAD5), size: 20),
           ],
@@ -1317,8 +1482,9 @@ class _PopularServicesSection extends StatelessWidget {
     if (n.contains('fold'))    return Icons.local_laundry_service_rounded;
     if (n.contains('dry'))     return Icons.dry_cleaning_rounded;
     if (n.contains('shoe'))    return Icons.shopping_bag_rounded;
-    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket'))
-                               return Icons.curtains_rounded;
+    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket')) {
+      return Icons.curtains_rounded;
+    }
     if (n.contains('carpet'))  return Icons.cleaning_services_rounded;
     if (n.contains('bag'))     return Icons.shopping_bag_outlined;
     if (n.contains('premium')) return Icons.star_rounded;
@@ -1406,7 +1572,7 @@ class _PopularServicesSection extends StatelessWidget {
                                 ? Image.network(
                                     s.imageUrl!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Icon(
+                                    errorBuilder: (_, _, _) => Icon(
                                         _iconFor(s.name),
                                         color: _kPrimary,
                                         size: 30),
@@ -1579,8 +1745,9 @@ class _AllServicesSectionState extends ConsumerState<_AllServicesSection> {
     if (n.contains('fold'))    return Icons.local_laundry_service_rounded;
     if (n.contains('dry'))     return Icons.dry_cleaning_rounded;
     if (n.contains('shoe'))    return Icons.shopping_bag_rounded;
-    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket'))
-                               return Icons.curtains_rounded;
+    if (n.contains('saree') || n.contains('curtain') || n.contains('blanket')) {
+      return Icons.curtains_rounded;
+    }
     if (n.contains('carpet'))  return Icons.cleaning_services_rounded;
     if (n.contains('bag'))     return Icons.shopping_bag_outlined;
     if (n.contains('premium')) return Icons.star_rounded;
@@ -1650,7 +1817,7 @@ class _AllServicesSectionState extends ConsumerState<_AllServicesSection> {
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             itemCount: itemCount,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               if (index >= services.length) {
                 // Trailing loader chip
@@ -1728,7 +1895,7 @@ class _ServiceChip extends StatelessWidget {
                 ? Image.network(
                     imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (_, _, _) =>
                         Icon(icon, color: _kPrimary, size: 22),
                   )
                 : Icon(icon, color: _kPrimary, size: 22),

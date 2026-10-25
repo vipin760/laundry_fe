@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/service_model.dart';
 import '../providers/cart_provider.dart';
 import '../providers/services_provider.dart';
@@ -37,6 +40,14 @@ class _ServicesViewState extends ConsumerState<ServicesView> {
   }
 
   Future<void> _onServiceTap(ServiceModel service) async {
+    // Adding to cart is account-based (App Store Guideline 5.1.1(v)) — guests
+    // must be sent to login instead of the item being optimistically added
+    // locally and silently failing server-side with a 401.
+    if (!ref.read(authProvider).isAuthenticated) {
+      context.push(AppRoutes.login);
+      return;
+    }
+
     final alreadyAdded = ref.read(cartProvider).quantityFor(service.id, 'instant') > 0;
     if (alreadyAdded) {
       return;

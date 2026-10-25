@@ -144,7 +144,9 @@ class PlacesService {
         if (types.contains('locality')) city = longName;
         if (types.contains('administrative_area_level_1')) state = longName;
         if (types.contains('sublocality_level_1') ||
-            types.contains('sublocality')) area = longName;
+            types.contains('sublocality')) {
+          area = longName;
+        }
       }
 
       return PlaceDetail(

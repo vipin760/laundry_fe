@@ -620,19 +620,6 @@ class _InfoNote extends StatelessWidget {
   );
 }
 
-class _BillRow extends StatelessWidget {
-  const _BillRow(this.label, this.value);
-  final String label;
-  final String value;
-  @override
-  Widget build(BuildContext context) => Row(children: [
-    Expanded(child: Text(label,
-        style: const TextStyle(fontSize: 13, color: _kGrey, fontWeight: FontWeight.w600))),
-    Text(value,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kDark)),
-  ]);
-}
-
 class _DeliveryTypeOption extends StatelessWidget {
   const _DeliveryTypeOption({
     required this.icon,

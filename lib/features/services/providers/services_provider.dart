@@ -27,11 +27,11 @@ final servicesProvider = FutureProvider<List<ServiceModel>>((ref) async {
         payload is Map<String, dynamic> ? payload['data'] : payload;
 
     debugPrint('[servicesProvider] rawData: ${rawData.runtimeType}, '
-        'count: ${rawData is List ? (rawData as List).length : "not a list"}');
+        'count: ${rawData is List ? rawData.length : "not a list"}');
 
     if (rawData is! List) return const [];
 
-    final services = (rawData as List)
+    final services = rawData
         .whereType<Map>()
         .map((item) => item.map((k, v) => MapEntry(k.toString(), v)))
         .map(ServiceModel.fromJson)

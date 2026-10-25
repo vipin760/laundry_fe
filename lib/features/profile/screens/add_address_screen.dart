@@ -9,7 +9,6 @@ import '../../location/models/address_model.dart';
 
 const _kBlue   = Color(0xFF2453FF);
 const _kBorder = Color(0xFFDDE1EE);
-const _kFill   = Color(0xFFF7F8FC);
 const _kIcon   = Color(0xFF9BA3C0);
 const _kText   = Color(0xFF1A1D2E);
 const _kHint   = Color(0xFFB0B7CC);
@@ -143,9 +142,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         if ((_stateCtrl.text.trim().isEmpty || _cityStateDefaulted) && state.isNotEmpty) _stateCtrl.text = state;
         _cityStateDefaulted = false;
         if (_landmarkCtrl.text.trim().isEmpty) _landmarkCtrl.text = m.name               ?? '';
-        if (_addressCtrl.text.trim().isEmpty)  _addressCtrl.text  =
-            [m.subThoroughfare, m.thoroughfare, m.subLocality]
-                .where((s) => s != null && s.isNotEmpty).join(', ');
+        if (_addressCtrl.text.trim().isEmpty) {
+          _addressCtrl.text =
+              [m.subThoroughfare, m.thoroughfare, m.subLocality]
+                  .where((s) => s != null && s.isNotEmpty).join(', ');
+        }
       });
       _toast('Location detected!', ok: true);
     } catch (e, stackTrace) {
@@ -375,7 +376,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 onPressed: _saving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kBlue,
-                  disabledBackgroundColor: _kBlue.withOpacity(0.5),
+                  disabledBackgroundColor: _kBlue.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
@@ -449,7 +450,7 @@ class _Card extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: child,
       );

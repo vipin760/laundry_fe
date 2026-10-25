@@ -161,7 +161,7 @@ class _SelectDeliveryAddressSheetState
                 padding: EdgeInsets.all(32),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (_, __) => const Padding(
+              error: (_, _) => const Padding(
                 padding: EdgeInsets.all(32),
                 child: Text('Could not load your addresses.', style: TextStyle(color: _kGrey)),
               ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import './referral_tab.dart';
 
 const _kPrimary = Color(0xFF1A23CC);
@@ -90,10 +89,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _kPrimary.withOpacity(0.05),
+              color: _kPrimary.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _kPrimary.withOpacity(0.1),
+                color: _kPrimary.withValues(alpha: 0.1),
               ),
             ),
             child: Column(
@@ -102,7 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: _kPrimary.withOpacity(0.2),
+                    color: _kPrimary.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -157,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  _kPrimary.withOpacity(0.8),
+                  _kPrimary.withValues(alpha: 0.8),
                   _kPrimaryDark,
                 ],
                 begin: Alignment.topLeft,
@@ -229,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             trailing: Switch(
               value: true,
               onChanged: (value) {},
-              activeColor: _kPrimary,
+              activeThumbColor: _kPrimary,
             ),
           ),
           _buildSettingsTile(

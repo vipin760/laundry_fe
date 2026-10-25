@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../checkout/models/checkout_models.dart';
 import '../../checkout/providers/checkout_slot_provider.dart';
 import '../../checkout/screens/scheduling_screen.dart';
@@ -97,10 +100,22 @@ class _PickupDeliveryScreenState
           // ── Location strip ────────────────────────────────────────────────
           _LocationStrip(
             address: selectedAddr,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CheckoutAddressScreen()),
-            ),
+            onTap: () {
+              // Selecting a delivery location here always ends in saving it
+              // to the account's address book (CheckoutAddressScreen only
+              // has one path: fill the form, POST /user/addresses) — that's
+              // account-based, unlike the public serviceability check this
+              // screen also does. Guests are sent to login before opening
+              // the screen, not after an unauthenticated API call fails.
+              if (!ref.read(authProvider).isAuthenticated) {
+                context.push(AppRoutes.login);
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CheckoutAddressScreen()),
+              );
+            },
           ),
           const Divider(height: 1, color: Color(0xFFE9EDFA)),
 
@@ -377,7 +392,7 @@ class _ScheduledView extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(child: CircularProgressIndicator(color: _kBlue)),
             ),
-            error: (_, __) => Padding(
+            error: (_, _) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: _ErrorView(
                 message: 'Schedule not available right now.',
@@ -647,6 +662,14 @@ Future<void> handleAddToCart(
   ServiceModel service,
   String category,
 ) async {
+  // Adding to cart is account-based (App Store Guideline 5.1.1(v)) — guests
+  // must be sent to login instead of the item being optimistically added
+  // locally and silently failing server-side with a 401.
+  if (!ref.read(authProvider).isAuthenticated) {
+    context.push(AppRoutes.login);
+    return;
+  }
+
   final cart = ref.read(cartProvider);
   if (cart.conflictsWith(category)) {
     final other = category == 'instant' ? 'Scheduled' : 'Instant';
@@ -729,7 +752,7 @@ class _ServiceRow extends ConsumerWidget {
                   ? Image.network(
                       service.imageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _FallbackIcon(
+                      errorBuilder: (_, _, _) => _FallbackIcon(
                         icon: _iconFor(service.name),
                         selected: qty > 0,
                       ),
@@ -901,7 +924,6 @@ class _CartBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     final count = cart.totalItemsCount;
-    final total = cart.totalPrice;
 
     if (count == 0) return const SizedBox.shrink();
 

@@ -9,11 +9,11 @@ class CouponInputWidget extends ConsumerStatefulWidget {
   final Function(double) onCouponApplied;
 
   const CouponInputWidget({
-    Key? key,
+    super.key,
     required this.orderId,
     required this.orderAmount,
     required this.onCouponApplied,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<CouponInputWidget> createState() => _CouponInputWidgetState();
@@ -131,8 +131,8 @@ class _CouponInputWidgetState extends ConsumerState<CouponInputWidget> {
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.08),
-              border: Border.all(color: Colors.green.withOpacity(0.3)),
+              color: Colors.green.withValues(alpha: 0.08),
+              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -283,11 +283,11 @@ class _CouponInputWidgetState extends ConsumerState<CouponInputWidget> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: isEligible
-                          ? const Color(0xFF2453FF).withOpacity(0.08)
+                          ? const Color(0xFF2453FF).withValues(alpha: 0.08)
                           : Colors.grey.shade100,
                       border: Border.all(
                         color: isEligible
-                            ? const Color(0xFF2453FF).withOpacity(0.3)
+                            ? const Color(0xFF2453FF).withValues(alpha: 0.3)
                             : Colors.grey.shade300,
                       ),
                       borderRadius: BorderRadius.circular(8),

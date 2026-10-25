@@ -94,6 +94,7 @@ class LocationPermissionService {
               LocationSettings(accuracy: LocationAccuracy.high, timeLimit: timeout),
         );
       } on TimeoutException {
+        if (!context.mounted) return null;
         final cached = await _fallbackToLastKnown(context);
         if (cached != null) return cached;
         if (context.mounted) {
@@ -107,6 +108,7 @@ class LocationPermissionService {
       }
     } catch (e, stackTrace) {
       debugPrint('[Location] getCurrentPosition failed: $e\n$stackTrace');
+      if (!context.mounted) return null;
       final cached = await _fallbackToLastKnown(context);
       if (cached != null) return cached;
       if (context.mounted) {

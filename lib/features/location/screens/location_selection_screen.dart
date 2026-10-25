@@ -14,7 +14,6 @@ import 'saved_addresses_screen.dart';
 // ── Brand colours ─────────────────────────────────────────────────────────────
 const _kBlue     = Color(0xFF1A23CC);
 const _kBlueDk   = Color(0xFF0F1899);
-const _kBg       = Color(0xFFF5F6FA);
 const _kDark     = Color(0xFF0A1645);
 const _kGrey     = Color(0xFF6B7280);
 const _kGreen    = Color(0xFF15803D);
@@ -267,7 +266,7 @@ class _LocationSelectionScreenState
             child: Center(
               child: AnimatedBuilder(
                 animation: _pinLift,
-                builder: (_, __) => Transform.translate(
+                builder: (_, _) => Transform.translate(
                   offset: Offset(0, _pinLift.value - 29),
                   child: _MapPin(lifted: _isMoving),
                 ),
@@ -357,7 +356,6 @@ class _BottomPanel extends StatelessWidget {
     required this.onConfirm,
     required this.onTryAgain,
     required this.onProceed,
-    this.service,
   });
 
   final _Phase phase;
@@ -368,7 +366,6 @@ class _BottomPanel extends StatelessWidget {
   final VoidCallback onConfirm;
   final VoidCallback onTryAgain;
   final VoidCallback onProceed;
-  final dynamic service;
 
   @override
   Widget build(BuildContext context) {
@@ -1006,4 +1003,3 @@ class _OutlineBtn extends StatelessWidget {
     );
   }
 }
-                                                                                                                                                                                                                                                                                                                                           

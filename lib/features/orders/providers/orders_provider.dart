@@ -88,7 +88,7 @@ class OrdersNotifier extends Notifier<OrdersState> {
     try {
       await _dio.post('/orders/$orderId/rate', data: {
         'rating': rating,
-        if (comment != null) 'comment': comment,
+        'comment': ?comment,
       });
       // Refresh orders to update rating in local state
       await fetchOrders();

@@ -461,7 +461,7 @@ class _AddEditAddressScreenState extends ConsumerState<AddEditAddressScreen> {
                     ),
                     Switch(
                       value: _isDefault,
-                      activeColor: _kBlue,
+                      activeThumbColor: _kBlue,
                       onChanged: (v) => setState(() => _isDefault = v),
                     ),
                   ],

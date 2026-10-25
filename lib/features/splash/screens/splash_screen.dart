@@ -268,7 +268,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // (e.g. bounce to /auth/login if unauthenticated, or to the delivery
     // partner home if applicable) — this just picks the best default.
     final from = GoRouterState.of(context).uri.queryParameters['from'];
-    final fallback = auth.isAuthenticated ? AppRoutes.home : AppRoutes.login;
+    // Home is guest-accessible (App Store Guideline 5.1.1(v) — browsing must
+    // not require an account), so unauthenticated users land there too, not
+    // on the login screen. The router's own redirect still enforces auth on
+    // every account-based route (and re-routes delivery partners), so this
+    // is just picking the best default landing spot.
+    final fallback = AppRoutes.home;
     final target = (from != null && from.isNotEmpty && from != AppRoutes.splash)
         ? from
         : fallback;
