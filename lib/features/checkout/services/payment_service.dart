@@ -267,6 +267,22 @@ class PaymentService {
     }
   }
 
+  /// Pickup & delivery fee rule (amount + free-above threshold) for display.
+  /// Returns null on any failure so checkout simply omits the estimate rather
+  /// than blocking the order. The backend stays authoritative for the charge.
+  Future<({double deliveryFeeAmount, double freeDeliveryThreshold})?> fetchPricingRules() async {
+    try {
+      final response = await _dio.get('/orders/pricing-rules');
+      final data = response.data as Map<String, dynamic>;
+      return (
+        deliveryFeeAmount: (data['deliveryFeeAmount'] as num).toDouble(),
+        freeDeliveryThreshold: (data['freeDeliveryThreshold'] as num).toDouble(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Re-confirm or change self-pickup vs home-delivery before paying.
   /// Only allowed while payment is still pending (backend-enforced).
   Future<void> updateDeliveryDetails({

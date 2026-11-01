@@ -232,6 +232,10 @@ class _InstantView extends ConsumerWidget {
                   Text('Delivery partner reaches you in ~15 minutes',
                       style: TextStyle(fontSize: 12, color: Color(0xFFB45309),
                           fontWeight: FontWeight.w500)),
+                  SizedBox(height: 6),
+                  Text('Need it urgently? Choose Instant Service for your last-minute laundry needs.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF92400E),
+                          fontWeight: FontWeight.w700, height: 1.35)),
                 ],
               )),
             ]),
@@ -324,6 +328,44 @@ class _ScheduledView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Savings banner ───────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_kGreen.withAlpha(25), _kGreen.withAlpha(10)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _kGreen.withAlpha(60)),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _kGreen,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Scheduled Service',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900,
+                          color: Color(0xFF14532D))),
+                  SizedBox(height: 3),
+                  Text('Schedule your service and save up to 40%.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF15803D),
+                          fontWeight: FontWeight.w700, height: 1.35)),
+                ],
+              )),
+            ]),
+          ),
+          const SizedBox(height: 20),
+
           // ── Services ─────────────────────────────────────────────────
           _SectionHeader(
             title: 'SCHEDULED SERVICE',

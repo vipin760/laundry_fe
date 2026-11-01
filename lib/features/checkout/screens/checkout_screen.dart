@@ -40,8 +40,26 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   DeliveryType _deliveryType = DeliveryType.homeDelivery;
   AddressModel? _deliveryAddress;
 
-  static const double _freeDeliveryThreshold = 249;
-  static const double _deliveryFeeAmount = 49;
+  // Pickup & delivery fee rule — fetched from the backend (PricingConfig), never
+  // hardcoded here. Used for display only: the charge itself is computed
+  // server-side when the order is itemized.
+  double? _deliveryFeeAmount;
+  double? _freeDeliveryThreshold;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPricingRules();
+  }
+
+  Future<void> _loadPricingRules() async {
+    final rules = await _paymentService.fetchPricingRules();
+    if (!mounted || rules == null) return;
+    setState(() {
+      _deliveryFeeAmount = rules.deliveryFeeAmount;
+      _freeDeliveryThreshold = rules.freeDeliveryThreshold;
+    });
+  }
 
   /// Single source of truth for delivery-fee eligibility: true whenever at
   /// least one leg of this order requires a delivery partner to travel
@@ -58,13 +76,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       widget.checkoutContext.serviceType == CheckoutServiceType.homeReception ||
       _deliveryType == DeliveryType.homeDelivery;
 
-  // Calculate shipping charges based on total amount
-  double _calculateShippingCharges(double totalAmount) {
-    if (!_hasHomeLeg || !_shippingEnabled) return 0;
-    return totalAmount >= _freeDeliveryThreshold ? 0 : _deliveryFeeAmount;
-  }
+  /// The pickup & delivery fee is a Home Pickup service charge: a Drop at Shop
+  /// (self drop) order never pays it, whatever the return method. Mirrors the
+  /// backend rule, which stays authoritative.
+  bool get _feeApplies =>
+      widget.checkoutContext.serviceType == CheckoutServiceType.collectFromHome ||
+      widget.checkoutContext.serviceType == CheckoutServiceType.homeReception;
 
-  double get _shippingCharges => _calculateShippingCharges(widget.checkoutContext.expectedAmount);
+  /// Estimated pickup & delivery fee: applies only to a fee-eligible order and
+  /// a service bill strictly below the free-delivery threshold. 0 until the
+  /// backend rule has loaded, so a stale/guessed fee is never shown.
+  double get _shippingCharges {
+    final fee = _deliveryFeeAmount;
+    final threshold = _freeDeliveryThreshold;
+    if (!_feeApplies || fee == null || threshold == null) return 0;
+    return widget.checkoutContext.expectedAmount >= threshold ? 0 : fee;
+  }
 
   Future<void> _chooseDeliveryAddress() async {
     final picked = await showSelectDeliveryAddressSheet(context);
@@ -117,14 +144,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // User pays from My Orders > Order Detail once admin confirms the bill.
       // We always use the simple checkout endpoint — Razorpay is initiated later.
 
-      // Add shipping charges to the expected amount if shipping is enabled
-      final totalAmount = widget.checkoutContext.expectedAmount + _shippingCharges;
-
+      // The pickup & delivery fee is added by the backend when the order is
+      // itemized — the client never submits a fee or a total.
       final orderData = await _paymentService.placeOrderOnly(
         checkoutContext: CheckoutContext(
           serviceType: widget.checkoutContext.serviceType,
           paymentMethod: widget.checkoutContext.paymentMethod,
-          expectedAmount: totalAmount,
+          expectedAmount: widget.checkoutContext.expectedAmount,
           pickupSlot: widget.checkoutContext.pickupSlot,
           deliverySlot: widget.checkoutContext.deliverySlot,
           pickupAddress: widget.checkoutContext.pickupAddress,
@@ -374,8 +400,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Order for ₹${_freeDeliveryThreshold.toStringAsFixed(0)} or more to get FREE delivery.'
-                      'Otherwise, a ₹${_deliveryFeeAmount.toStringAsFixed(0)} delivery fee applies.',
+                      !_feeApplies
+                          ? 'No pickup & delivery fee applies to Drop at Shop orders.'
+                          : _deliveryFeeAmount != null && _freeDeliveryThreshold != null
+                          ? 'Order for ₹${_freeDeliveryThreshold!.toStringAsFixed(0)} or more to get FREE delivery. '
+                              'Otherwise, a ₹${_deliveryFeeAmount!.toStringAsFixed(0)} pickup & delivery fee applies.'
+                          : 'Orders below the free-delivery minimum carry a pickup & delivery fee.',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kGrey),
                     ),
                   ]),
@@ -384,6 +414,28 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
             ),
             const SizedBox(height: 14),
+
+            // Estimate only — the final bill is confirmed after inspection.
+            if (_feeApplies && _deliveryFeeAmount != null && _freeDeliveryThreshold != null) ...[
+              _SectionCard(
+                header: 'Estimated Summary',
+                child: Column(children: [
+                  _EstimateRow('Service subtotal', '₹${ctx.expectedAmount.toStringAsFixed(0)}'),
+                  const SizedBox(height: 6),
+                  _EstimateRow(
+                    'Pickup & delivery fee',
+                    _shippingCharges > 0 ? '₹${_shippingCharges.toStringAsFixed(0)}' : 'FREE',
+                  ),
+                  const Divider(height: 20),
+                  _EstimateRow(
+                    'Estimated total',
+                    '₹${(ctx.expectedAmount + _shippingCharges).toStringAsFixed(0)}',
+                    bold: true,
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 14),
+            ],
           ],
 
           // ── 2. Price notice ────────────────────────────────────────────
@@ -681,4 +733,19 @@ class _ErrorCard extends StatelessWidget {
               color: Color(0xFF991B1B), height: 1.4))),
     ]),
   );
+}
+
+class _EstimateRow extends StatelessWidget {
+  const _EstimateRow(this.label, this.value, {this.bold = false});
+  final String label;
+  final String value;
+  final bool bold;
+  @override
+  Widget build(BuildContext context) {
+    final weight = bold ? FontWeight.w900 : FontWeight.w600;
+    return Row(children: [
+      Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: bold ? _kDark : _kGrey, fontWeight: weight))),
+      Text(value, style: TextStyle(fontSize: 13, color: _kDark, fontWeight: bold ? FontWeight.w900 : FontWeight.w700)),
+    ]);
+  }
 }

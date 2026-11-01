@@ -566,6 +566,17 @@ class _WashIronCard extends StatelessWidget {
               height: 1.2,
             ),
           ),
+          const SizedBox(height: 8),
+          const Text(
+            'Need it urgently? Choose Instant Service for your last-minute laundry needs.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xE6FFFFFF),
+              height: 1.35,
+            ),
+          ),
         ],
       ),
     ),   // GestureDetector child (Container)
@@ -621,6 +632,17 @@ class _ScheduledCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: Color(0xFF0A1645),
               height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Schedule your service and save up to 40%.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF15803D),
+              height: 1.35,
             ),
           ),
         ],
