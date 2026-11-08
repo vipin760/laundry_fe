@@ -134,6 +134,7 @@ class _PickupDeliveryScreenState
                   _TabPill(
                     icon: Icons.bolt_rounded,
                     label: 'Instant',
+                    subtitle: 'For your last min need',
                     selected: _isInstant,
                     onTap: () => setState(() => _isInstant = true),
                   ),
@@ -141,6 +142,8 @@ class _PickupDeliveryScreenState
                   _TabPill(
                     icon: Icons.calendar_month_rounded,
                     label: 'Scheduled',
+                    subtitle: 'Save upto 40%',
+                    subtitleIsPromo: true,
                     selected: !_isInstant,
                     onTap: () => setState(() => _isInstant = false),
                   ),
@@ -572,10 +575,15 @@ class _TabPill extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.subtitle,
+    this.subtitleIsPromo = false,
   });
 
   final IconData icon;
   final String label;
+  final String? subtitle;
+  /// Shows the subtitle in the green "savings" colour while unselected.
+  final bool subtitleIsPromo;
   final bool selected;
   final VoidCallback onTap;
 
@@ -594,20 +602,43 @@ class _TabPill extends StatelessWidget {
                 ? [BoxShadow(color: _kBlue.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))]
                 : [],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16,
-                  color: selected ? Colors.white : const Color(0xFF6B7280)),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: selected ? Colors.white : const Color(0xFF374151),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 16,
+                      color: selected ? Colors.white : const Color(0xFF6B7280)),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: selected ? Colors.white : const Color(0xFF374151),
+                    ),
+                  ),
+                ],
               ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? Colors.white.withAlpha(210)
+                        : (subtitleIsPromo
+                            ? const Color(0xFF15803D)
+                            : const Color(0xFF6B7280)),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

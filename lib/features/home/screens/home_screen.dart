@@ -566,6 +566,35 @@ class _WashIronCard extends StatelessWidget {
               height: 1.2,
             ),
           ),
+          const SizedBox(height: 8),
+          // Subtitle pill (frosted white on the blue card)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(38),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withAlpha(70)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.timer_outlined, size: 13, color: Colors.white),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'For your last min need',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withAlpha(240),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     ),   // GestureDetector child (Container)
@@ -621,6 +650,35 @@ class _ScheduledCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: Color(0xFF0A1645),
               height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Savings pill (green promo)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF9F0),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFBBE5C6)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.local_offer_rounded, size: 13, color: Color(0xFF15803D)),
+                SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'Save upto 40%',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF15803D),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
