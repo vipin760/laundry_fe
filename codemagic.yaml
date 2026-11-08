@@ -58,7 +58,7 @@ workflows:
           echo "Using CFBundleVersion (build number): $BUILD_NUMBER"
           flutter build ipa --release \
             --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY \
-            --build-name=1.0.0 \
+            --build-name=1.0.1 \
             --build-number=$BUILD_NUMBER \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
