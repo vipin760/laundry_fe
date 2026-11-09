@@ -40,6 +40,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   DeliveryType _deliveryType = DeliveryType.homeDelivery;
   AddressModel? _deliveryAddress;
 
+  // Pickup & delivery fee rule — DISPLAY ONLY. The backend (PricingConfig)
+  // decides and charges the fee when the order is itemized; keep these in
+  // sync with it (₹49 when the service bill, before discounts, is < ₹249).
   static const double _freeDeliveryThreshold = 249;
   static const double _deliveryFeeAmount = 49;
 
@@ -57,14 +60,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       widget.checkoutContext.serviceType == CheckoutServiceType.collectFromHome ||
       widget.checkoutContext.serviceType == CheckoutServiceType.homeReception ||
       _deliveryType == DeliveryType.homeDelivery;
-
-  // Calculate shipping charges based on total amount
-  double _calculateShippingCharges(double totalAmount) {
-    if (!_hasHomeLeg || !_shippingEnabled) return 0;
-    return totalAmount >= _freeDeliveryThreshold ? 0 : _deliveryFeeAmount;
-  }
-
-  double get _shippingCharges => _calculateShippingCharges(widget.checkoutContext.expectedAmount);
 
   Future<void> _chooseDeliveryAddress() async {
     final picked = await showSelectDeliveryAddressSheet(context);
@@ -117,14 +112,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // User pays from My Orders > Order Detail once admin confirms the bill.
       // We always use the simple checkout endpoint — Razorpay is initiated later.
 
-      // Add shipping charges to the expected amount if shipping is enabled
-      final totalAmount = widget.checkoutContext.expectedAmount + _shippingCharges;
-
+      // The pickup & delivery fee is added by the backend when the order is
+      // itemized — the client never submits a fee or a fee-inclusive total.
       final orderData = await _paymentService.placeOrderOnly(
         checkoutContext: CheckoutContext(
           serviceType: widget.checkoutContext.serviceType,
           paymentMethod: widget.checkoutContext.paymentMethod,
-          expectedAmount: totalAmount,
+          expectedAmount: widget.checkoutContext.expectedAmount,
           pickupSlot: widget.checkoutContext.pickupSlot,
           deliverySlot: widget.checkoutContext.deliverySlot,
           pickupAddress: widget.checkoutContext.pickupAddress,
@@ -374,8 +368,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Order for ₹${_freeDeliveryThreshold.toStringAsFixed(0)} or more to get FREE delivery.'
-                      'Otherwise, a ₹${_deliveryFeeAmount.toStringAsFixed(0)} delivery fee applies.',
+                      'Order for ₹${_freeDeliveryThreshold.toStringAsFixed(0)} or more to get FREE pickup & delivery. '
+                      'Otherwise, a ₹${_deliveryFeeAmount.toStringAsFixed(0)} pickup & delivery fee applies.',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kGrey),
                     ),
                   ]),

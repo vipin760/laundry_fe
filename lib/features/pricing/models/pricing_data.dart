@@ -90,7 +90,7 @@ class PricingData {
       category: 'washFold',
     ),
     Note(
-      text: 'Below ₹249 → ₹49 delivery charge',
+      text: 'Below ₹249 → ₹49 pickup & delivery fee',
       category: 'washFold',
     ),
   ];

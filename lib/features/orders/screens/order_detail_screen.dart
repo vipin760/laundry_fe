@@ -510,7 +510,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
     final rows = <Widget>[];
     if ((order.taxAmount ?? 0) > 0) rows.add(row('GST', order.taxAmount!));
-    if ((order.deliveryFee ?? 0) > 0) rows.add(row('Delivery Fee', order.deliveryFee!));
+    if ((order.deliveryFee ?? 0) > 0) rows.add(row('Pickup & Delivery Fee', order.deliveryFee!));
     if ((order.platformFee ?? 0) > 0) rows.add(row('Platform Fee', order.platformFee!));
     if ((order.convenienceFee ?? 0) > 0) rows.add(row('Convenience Fee', order.convenienceFee!));
     if ((order.packagingFee ?? 0) > 0) rows.add(row('Packaging Fee', order.packagingFee!));
