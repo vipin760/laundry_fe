@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/widgets/app_text.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -21,11 +25,40 @@ void _copy(BuildContext context, String value, String msg) {
 /// On handover the partner asks the customer for the 4-digit OTP the
 /// customer received after payment, and enters it here to complete
 /// the delivery.
-class DeliveryPartnerHomeScreen extends ConsumerWidget {
+class DeliveryPartnerHomeScreen extends ConsumerStatefulWidget {
   const DeliveryPartnerHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DeliveryPartnerHomeScreen> createState() =>
+      _DeliveryPartnerHomeScreenState();
+}
+
+class _DeliveryPartnerHomeScreenState
+    extends ConsumerState<DeliveryPartnerHomeScreen> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // If the customer pays from their own app, the "Enter customer OTP"
+    // action must appear here without the partner having to refresh.
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
+      final st = ref.read(deliveryOrdersProvider);
+      final waiting = st.active.any((o) => o.paymentStatus != PaymentStatus.completed);
+      if (mounted && waiting && !st.isLoading) {
+        ref.read(deliveryOrdersProvider.notifier).fetchAssigned();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(deliveryOrdersProvider);
     final partnerName = ref.watch(authProvider).user?.name;
 
@@ -118,6 +151,7 @@ class DeliveryPartnerHomeScreen extends ConsumerWidget {
             (o) => _DeliveryCard(
               order: o,
               onConfirm: () => _openOtpSheet(context, ref, o),
+              onPayNow: () => _openPaySheet(context, ref, o),
             ),
           ),
           const SizedBox(height: 20),
@@ -156,6 +190,18 @@ class DeliveryPartnerHomeScreen extends ConsumerWidget {
     }
   }
 
+  void _openPaySheet(BuildContext context, WidgetRef ref, OrderModel order) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _PayNowSheet(order: order),
+    );
+  }
+
   void _openOtpSheet(BuildContext context, WidgetRef ref, OrderModel order) {
     showModalBottomSheet(
       context: context,
@@ -172,10 +218,11 @@ class DeliveryPartnerHomeScreen extends ConsumerWidget {
 // ── Order card ────────────────────────────────────────────────────────────────
 
 class _DeliveryCard extends StatelessWidget {
-  const _DeliveryCard({required this.order, this.onConfirm});
+  const _DeliveryCard({required this.order, this.onConfirm, this.onPayNow});
 
   final OrderModel order;
   final VoidCallback? onConfirm;
+  final VoidCallback? onPayNow;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +391,33 @@ class _DeliveryCard extends StatelessWidget {
           AppText('₹${order.effectiveAmount.toStringAsFixed(0)}',
               fontSize: 15, fontWeight: FontWeight.w800,
               color: const Color(0xFF1B8A46)),
-          if (isActive) ...[
+          if (isActive && order.paymentStatus != PaymentStatus.completed) ...[
+            // Unpaid: no OTP exists yet. Collect payment first.
+            const SizedBox(height: 12),
+            const AppText(
+              'Payment pending. The customer gets their OTP only after paying.',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFB25E09),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onPayNow,
+                icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                label: const Text('Pay now'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1B8A46),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (isActive) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -361,6 +434,193 @@ class _DeliveryCard extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Pay-now bottom sheet ──────────────────────────────────────────────────────
+
+/// Shows a payment link/QR the customer can pay with. Payment is confirmed
+/// only by the server (webhook / Razorpay sync) — this sheet just polls.
+/// Once paid it closes and the card switches to "Enter customer OTP".
+class _PayNowSheet extends ConsumerStatefulWidget {
+  const _PayNowSheet({required this.order});
+
+  final OrderModel order;
+
+  @override
+  ConsumerState<_PayNowSheet> createState() => _PayNowSheetState();
+}
+
+class _PayNowSheetState extends ConsumerState<_PayNowSheet> {
+  String? _link;
+  DateTime? _expiresAt;
+  String? _error;
+  bool _loading = true;
+  bool _paid = false;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final r = await ref
+        .read(deliveryOrdersProvider.notifier)
+        .startPayment(widget.order.id);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _link = r.link;
+      _expiresAt = r.expiresAt;
+      _error = r.error;
+    });
+    if (r.link != null) {
+      _poll?.cancel();
+      _poll = Timer.periodic(const Duration(seconds: 4), (_) => _check());
+    }
+  }
+
+  Future<void> _check() async {
+    final paid = await ref
+        .read(deliveryOrdersProvider.notifier)
+        .isOrderPaid(widget.order.id);
+    if (!mounted || paid != true) return;
+    _poll?.cancel();
+    setState(() => _paid = true);
+    await ref.read(deliveryOrdersProvider.notifier).fetchAssigned();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = widget.order.effectiveAmount.toStringAsFixed(0);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppText('Collect payment · #${widget.order.displayNumber}',
+              fontSize: 17, fontWeight: FontWeight.w800),
+          const SizedBox(height: 6),
+          AppText('Amount due: ₹$amount',
+              fontSize: 14, fontWeight: FontWeight.w700,
+              color: const Color(0xFF1B8A46)),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ))
+          else if (_paid) ...[
+            const Center(child: Icon(Icons.check_circle_rounded,
+                size: 64, color: Color(0xFF1B8A46))),
+            const SizedBox(height: 12),
+            const Center(
+              child: AppText('Payment received',
+                  fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            const Center(
+              child: AppText(
+                'The customer has been sent their OTP. Ask them for it to complete the delivery.',
+                fontSize: 13, color: Colors.black54, textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Done'),
+              ),
+            ),
+          ] else if (_error != null) ...[
+            AppText(_error!,
+                fontSize: 13, fontWeight: FontWeight.w600,
+                color: const Color(0xFFD32F2F)),
+            const SizedBox(height: 12),
+            ElevatedButton(onPressed: _start, child: const Text('Try again')),
+          ] else ...[
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.black12),
+                ),
+                child: QrImageView(data: _link!, size: 200),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Center(
+              child: AppText('Customer scans this with any UPI app, or pay via the link.',
+                  fontSize: 12, color: Colors.black54, textAlign: TextAlign.center),
+            ),
+            if (_expiresAt != null) ...[
+              const SizedBox(height: 4),
+              Center(
+                child: AppText(
+                  'Valid until ${TimeOfDay.fromDateTime(_expiresAt!).format(context)}',
+                  fontSize: 12, color: Colors.black45),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _copy(context, _link!, 'Payment link copied'),
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('Copy link'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Share.share(
+                        'Pay ₹$amount for Laundry Brew order #${widget.order.displayNumber}: $_link'),
+                    icon: const Icon(Icons.share_rounded, size: 16),
+                    label: const Text('Send link'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: const [
+                SizedBox(width: 14, height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                AppText('Waiting for payment…',
+                    fontSize: 12, color: Colors.black54),
+              ],
             ),
           ],
         ],

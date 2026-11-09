@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
+import '../../../core/realtime/order_realtime.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/widgets/app_text.dart';
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
@@ -16,9 +19,10 @@ import '../../wallet/providers/wallet_provider.dart';
 import '../models/order_model.dart';
 import '../providers/orders_provider.dart';
 import '../widgets/delivery_confirmation_sheet.dart';
-import '../widgets/invoice_download_button.dart';
 import '../widgets/order_payment_sheet.dart';
+import '../widgets/order_payment_status_card.dart';
 import '../widgets/order_photo_gallery.dart';
+import '../services/payment_qr_service.dart';
 
 // Private type aliases so legacy _PaymentSheet code still compiles.
 // The actual sheet opened by _showPaymentSheet uses showOrderPaymentSheet().
@@ -50,8 +54,16 @@ class OrderDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
-class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
+class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
+    with WidgetsBindingObserver {
   final _paymentService = PaymentService();
+  final _qrService = PaymentQrService();
+
+  /// Fallback for a dropped socket: while a payment is outstanding, ask the
+  /// server (which verifies with the gateway) whether it has landed.
+  Timer? _pollTimer;
+  int _pollTick = 0;
+  bool _syncing = false;
   late final AppRazorpay _razorpay;
 
   OrderModel? _order;
@@ -67,11 +79,15 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     _razorpay = AppRazorpay();
     _razorpay.on(AppRazorpay.EVENT_PAYMENT_SUCCESS, _onPaySuccess);
     _razorpay.on(AppRazorpay.EVENT_PAYMENT_ERROR, _onPayError);
+    WidgetsBinding.instance.addObserver(this);
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _pollPayment());
     _fetchOrder();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _razorpay.clear();
     super.dispose();
   }
@@ -84,6 +100,58 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     } catch (e) {
       if (mounted) setState(() { _loading = false; });
     }
+  }
+
+  /// Re-reads the order with no spinner — used for realtime pushes, polling
+  /// and app-resume, so the screen updates itself without flicker.
+  Future<void> _refreshSilently() async {
+    try {
+      final fresh = await ref.read(ordersProvider.notifier).fetchOrderDetails(widget.orderId);
+      if (mounted && fresh != null) setState(() => _order = fresh);
+    } catch (_) {/* next push/poll/resume retries */}
+  }
+
+  /// Customer-initiated: the OTP expired, was locked after wrong attempts,
+  /// or was lost. The server issues a new one (old one stops working).
+  Future<void> _requestNewOtp() async {
+    final err = await _qrService.requestNewDeliveryOtp(widget.orderId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err ?? 'A new delivery OTP has been generated.')),
+    );
+    if (err == null) await _refreshSilently();
+  }
+
+  Future<void> _pollPayment() async {
+    final order = _order;
+    if (!mounted || order == null || _syncing || _paying) return;
+    if (order.paymentStatus == PaymentStatus.completed ||
+        order.status == OrderStatus.cancelled ||
+        order.status == OrderStatus.orderPlaced ||
+        order.status == OrderStatus.pickupAssigned) {
+      return;
+    }
+
+    // Poll briskly (6s) while a QR is up at the door; otherwise only every
+    // ~24s — enough to catch a webhook-confirmed payment if the socket dropped.
+    final waitingOnQr = order.isAwaitingQrPayment;
+    _pollTick++;
+    if (!waitingOnQr && _pollTick % 4 != 0) return;
+
+    _syncing = true;
+    try {
+      final paid = await _qrService.syncAndCheckPaid(order.id);
+      if (!mounted) return;
+      // paid == null means "couldn't check" — never treated as unpaid or paid.
+      if (paid == true || waitingOnQr) await _refreshSilently();
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshSilently();
   }
 
   // ── Payment handlers ──────────────────────────────────────────────────────
@@ -175,6 +243,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Realtime: the server confirmed/changed a payment for this order.
+    ref.listen<OrderPaymentEvent?>(orderPaymentEventProvider, (_, next) {
+      if (next != null && next.concerns(widget.orderId)) _refreshSilently();
+    });
+
     return Scaffold(
       backgroundColor: _kBg,
       appBar: AppBar(
@@ -286,6 +359,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               accentBg: _kGreenBg,
               photos: order.weighingPhotos,
             ),
+          ],
+
+          // Delivery-time QR: "Awaiting Payment" while the QR is on screen at
+          // the door, or "QR expired" with the way forward.
+          if (order.isAwaitingQrPayment || order.isQrExpired) ...[
+            const SizedBox(height: 16),
+            PaymentQrStatusBanner(order: order),
           ],
 
           // Pay Now button — shown when BREWING + payment pending
@@ -893,43 +973,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   // ── Payment confirmed banner ───────────────────────────────────────────────
 
-  Widget _buildPaymentConfirmed(OrderModel order) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _kGreenBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kGreen.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: _kGreen, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppText('Payment Successful', fontWeight: FontWeight.w800, color: _kGreen),
-                    const SizedBox(height: 3),
-                    AppText(
-                      '₹${(order.billAmount ?? order.totalAmount).toStringAsFixed(2)} paid successfully',
-                      fontSize: 12,
-                      color: _kText,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          InvoiceDownloadButton(orderId: order.id),
-        ],
-      ),
-    );
-  }
+  Widget _buildPaymentConfirmed(OrderModel order) => PaymentReceiptCard(order: order);
 
   // ── OTP section ────────────────────────────────────────────────────────────
 
@@ -1012,6 +1056,15 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _requestNewOtp,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Get a new OTP'),
             ),
           ),
         ],

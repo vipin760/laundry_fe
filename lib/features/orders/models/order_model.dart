@@ -153,6 +153,19 @@ class OrderModel {
 
   final OrderStatus status;
   final PaymentStatus paymentStatus;
+
+  // ── Payment completion details (additive — null on orders paid before the
+  // delivery-QR rollout; the receipt UI hides any line that is null) ───────
+  /// How the customer paid, e.g. 'UPI'.
+  final String? paymentMethod;
+  /// Bank/UPI reference (RRN), or the gateway payment id as a fallback.
+  final String? paymentTransactionId;
+  final DateTime? paymentCompletedAt;
+  /// 'ONLINE' (in-app checkout) or 'QR' (delivery-time UPI QR).
+  final String? paymentChannel;
+  /// Latest delivery-time QR state: QR_GENERATED | EXPIRED | CLOSED | PAID.
+  /// A display hint only — [paymentStatus] stays the single source of truth.
+  final String? paymentQrStatus;
   final String? address;
 
   /// Customer contact details — attached server-side for delivery-partner
@@ -234,6 +247,11 @@ class OrderModel {
     this.isManuallyAdjusted = false,
     required this.status,
     required this.paymentStatus,
+    this.paymentMethod,
+    this.paymentTransactionId,
+    this.paymentCompletedAt,
+    this.paymentChannel,
+    this.paymentQrStatus,
     this.address,
     this.customer,
     this.receptionDetails,
@@ -268,6 +286,14 @@ class OrderModel {
   /// Effective amount after itemization (falls back to original total).
   double get effectiveAmount => billAmount ?? totalAmount;
 
+  /// A delivery-time QR is live and the customer is expected to scan it.
+  bool get isAwaitingQrPayment =>
+      paymentStatus != PaymentStatus.completed && paymentQrStatus == 'QR_GENERATED';
+
+  /// The last delivery-time QR timed out without being paid.
+  bool get isQrExpired =>
+      paymentStatus != PaymentStatus.completed && paymentQrStatus == 'EXPIRED';
+
   /// True when a first-order discount was applied to this bill.
   bool get hasFirstOrderDiscount =>
       (firstOrderDiscountAmount ?? 0) > 0 && originalBillAmount != null;
@@ -295,6 +321,13 @@ class OrderModel {
       isManuallyAdjusted: json['isManuallyAdjusted'] as bool? ?? false,
       status: _parseOrderStatus(json['status']),
       paymentStatus: _parsePaymentStatus(json['paymentStatus']),
+      paymentMethod: json['paymentMethod'] as String?,
+      paymentTransactionId: json['paymentTransactionId'] as String?,
+      paymentCompletedAt: json['paymentCompletedAt'] != null
+          ? DateTime.tryParse(json['paymentCompletedAt'].toString())
+          : null,
+      paymentChannel: json['paymentChannel'] as String?,
+      paymentQrStatus: json['paymentQrStatus'] as String?,
       address: json['address'],
       customer: json['customer'] != null
           ? DeliveryCustomerContact.fromJson(json['customer'] as Map<String, dynamic>)

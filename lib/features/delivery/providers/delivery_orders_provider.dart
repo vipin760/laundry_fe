@@ -79,6 +79,40 @@ class DeliveryOrdersNotifier extends Notifier<DeliveryOrdersState> {
     }
   }
 
+  /// Creates (or reuses) the Razorpay payment link / QR for this order so the
+  /// customer can pay at the door. Returns the link + expiry, or an error.
+  Future<({String? link, DateTime? expiresAt, String? error})> startPayment(
+      String orderId) async {
+    try {
+      final r = await _dio.post('/payments/qr/orders/$orderId');
+      final qr = (r.data is Map ? r.data['qr'] : null) as Map?;
+      final link = qr?['upiUri'] as String?;
+      if (link == null || link.isEmpty) {
+        return (link: null, expiresAt: null, error: 'Could not create the payment link.');
+      }
+      final exp = DateTime.tryParse('${qr?['expiresAt']}')?.toLocal();
+      return (link: link, expiresAt: exp, error: null);
+    } on DioException catch (e) {
+      final m = e.response?.data is Map ? e.response!.data['message']?.toString() : null;
+      return (link: null, expiresAt: null, error: m ?? 'Could not create the payment link.');
+    } catch (_) {
+      return (link: null, expiresAt: null, error: 'Could not create the payment link.');
+    }
+  }
+
+  /// Server-verified paid check (the backend reconciles with Razorpay on read).
+  /// null = couldn't check; never treated as paid.
+  Future<bool?> isOrderPaid(String orderId) async {
+    try {
+      final r = await _dio.get('/payments/qr/orders/$orderId');
+      final order = r.data is Map ? r.data['order'] : null;
+      if (order is! Map) return null;
+      return order['paymentStatus'] == 'COMPLETED';
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Confirms handover by submitting the OTP the customer received after
   /// payment. Returns null on success, or an error message to display.
   Future<String?> completeDelivery(String orderId, String otp) async {

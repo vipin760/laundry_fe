@@ -11,6 +11,7 @@ import 'core/api/api_client.dart';
 import 'firebase_options.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/realtime/order_realtime.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/services/notification_service.dart';
 
@@ -112,6 +113,10 @@ class LaundryApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+
+    // One live socket for the signed-in customer: payment confirmations and
+    // QR state changes reach every order screen with no manual refresh.
+    ref.watch(orderRealtimeProvider);
 
     // Set router for notification deep linking
     NotificationService.instance.setRouter(router);
