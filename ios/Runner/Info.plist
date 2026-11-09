@@ -34,6 +34,37 @@
 	     instead of requiring a manual answer per upload. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- UPI Intent: the Razorpay iOS SDK calls canOpenURL() to detect which
+	     UPI apps are installed. iOS returns false for any scheme not listed
+	     here, so without this array checkout shows no UPI apps and never
+	     hands off to GPay/PhonePe/Paytm. List copied from Razorpay's
+	     Flutter/iOS integration docs (Paytm's scheme is "paytmmp"). -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+		<string>credpay</string>
+		<string>mobikwik</string>
+		<string>in.fampay.app</string>
+		<string>bhim</string>
+		<string>amazonpay</string>
+		<string>navi</string>
+		<string>kiwi</string>
+		<string>payzapp</string>
+		<string>jupiter</string>
+		<string>omnicard</string>
+		<string>icici</string>
+		<string>popclubapp</string>
+		<string>sbiyono</string>
+		<string>myjio</string>
+		<string>slice-upi</string>
+		<string>bobupi</string>
+		<string>shriramone</string>
+		<string>indusmobile</string>
+		<string>whatsapp</string>
+		<string>kotakbank</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
