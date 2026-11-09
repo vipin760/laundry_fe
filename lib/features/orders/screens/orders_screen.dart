@@ -465,7 +465,6 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
     _razorpay = AppRazorpay();
     _razorpay.on(AppRazorpay.EVENT_PAYMENT_SUCCESS, _onPaySuccess);
     _razorpay.on(AppRazorpay.EVENT_PAYMENT_ERROR, _onPayError);
-    _razorpay.on(AppRazorpay.EVENT_EXTERNAL_WALLET, (_) {});
   }
 
   @override
@@ -536,7 +535,10 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
         'retry': {'enabled': true, 'max_count': 1},
         'send_sms_hash': true,
         'prefill': {'contact': '8888888888', 'email': 'test@razorpay.com'},
-        'external': {'wallets': ['paytm']},
+        // No 'external' wallets: Razorpay hands those back to the app via
+        // EVENT_EXTERNAL_WALLET, and we have no handler, so the user hit a
+        // dead end. Add both together if external wallets are ever needed.
+        // Paytm is still offered as a UPI app.
       });
       if (mounted) setState(() => _paying = false);
     } catch (e) {

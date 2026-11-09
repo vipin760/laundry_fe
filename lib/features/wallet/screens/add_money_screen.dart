@@ -40,7 +40,6 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
     _razorpay = AppRazorpay();
     _razorpay.on(AppRazorpay.EVENT_PAYMENT_SUCCESS, _onPaySuccess);
     _razorpay.on(AppRazorpay.EVENT_PAYMENT_ERROR, _onPayError);
-    _razorpay.on(AppRazorpay.EVENT_EXTERNAL_WALLET, (_) {});
   }
 
   @override
