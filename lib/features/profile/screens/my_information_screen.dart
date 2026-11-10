@@ -48,12 +48,23 @@ class _MyInformationScreenState extends ConsumerState<MyInformationScreen> {
   Future<void> _pickAndUploadPhoto() async {
     setState(() { _photoError = null; });
 
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-      maxWidth: 800,
-    );
+    XFile? result;
+    try {
+      result = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 800,
+      );
+    } catch (e) {
+      // e.g. photo access denied in iOS Settings — the plugin throws a
+      // PlatformException instead of returning null.
+      if (mounted) {
+        setState(() => _photoError =
+            'Could not open your photos. Please allow photo access for LaundryBrew in Settings and try again.');
+      }
+      return;
+    }
+    final picked = result;
     if (picked == null) return; // user cancelled
 
     setState(() {

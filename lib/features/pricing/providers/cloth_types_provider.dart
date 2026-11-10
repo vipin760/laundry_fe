@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../models/cloth_type_model.dart';
 
@@ -48,11 +49,11 @@ final clothTypesProvider = FutureProvider<List<ClothTypeModel>>((ref) async {
     final msg = e.response?.data is Map<String, dynamic>
         ? (e.response!.data['message'] as String?)
         : null;
-    throw Exception(
-      msg ?? 'Failed to load pricing (${e.type.name}). Check connection.',
-    );
+    throw Exception(userErrorMessage(msg ?? e,
+        fallback: 'Could not load prices. Please try again.'));
   } catch (e, st) {
     debugPrint('[clothTypesProvider] Error: $e\n$st');
-    throw Exception(e.toString());
+    throw Exception(userErrorMessage(e,
+        fallback: 'Could not load prices. Please try again.'));
   }
 });

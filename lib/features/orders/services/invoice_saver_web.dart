@@ -1,5 +1,6 @@
 import 'dart:js_interop';
 import 'dart:typed_data';
+import 'dart:ui' show Rect;
 
 import 'package:web/web.dart' as web;
 
@@ -7,7 +8,7 @@ import 'package:web/web.dart' as web;
 /// sheet on web, so this triggers a normal browser download via a Blob URL
 /// instead (same `package:web`/js_interop approach already used by
 /// core/payments/app_razorpay_web.dart).
-Future<void> saveInvoice(List<int> bytes, String filename) async {
+Future<void> saveInvoice(List<int> bytes, String filename, {Rect? shareOrigin}) async {
   final blob = web.Blob(
     [Uint8List.fromList(bytes).toJS].toJS,
     web.BlobPropertyBag(type: 'application/pdf'),

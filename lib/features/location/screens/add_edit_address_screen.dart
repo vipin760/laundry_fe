@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/services/geocoding_service.dart';
 import '../../../core/services/location_permission_service.dart';
 import '../models/address_model.dart';
@@ -238,7 +239,8 @@ class _AddEditAddressScreenState extends ConsumerState<AddEditAddressScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'),
+            content: Text(userErrorMessage(e,
+                fallback: 'Could not save the address. Please try again.')),
             backgroundColor: const Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
             shape:

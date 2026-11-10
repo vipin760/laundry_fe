@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/order_model.dart';
@@ -70,7 +71,8 @@ class OrdersNotifier extends Notifier<OrdersState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: e.toString().replaceFirst('Exception: ', ''),
+        error: userErrorMessage(e,
+            fallback: 'Could not load your orders. Please try again.'),
       );
     }
   }

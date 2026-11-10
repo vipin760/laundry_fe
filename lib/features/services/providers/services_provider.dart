@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../models/service_model.dart';
 
@@ -51,12 +52,12 @@ final servicesProvider = FutureProvider<List<ServiceModel>>((ref) async {
     final msg = e.response?.data is Map<String, dynamic>
         ? (e.response!.data['message'] as String?)
         : null;
-    throw Exception(
-      msg ?? 'Failed to load services (${e.type.name}). Check connection.',
-    );
+    throw Exception(userErrorMessage(msg ?? e,
+        fallback: 'Could not load services. Please try again.'));
   } catch (e, st) {
     debugPrint('[servicesProvider] Error: $e\n$st');
-    throw Exception(e.toString());
+    throw Exception(userErrorMessage(e,
+        fallback: 'Could not load services. Please try again.'));
   }
 });
 
@@ -218,7 +219,9 @@ class PaginatedServicesNotifier extends Notifier<PaginatedServicesState> {
       );
     } catch (e) {
       state = state.copyWith(
-          isLoading: false, isLoadingMore: false, error: e.toString());
+          isLoading: false,
+          isLoadingMore: false,
+          error: userErrorMessage(e, fallback: 'Failed to load services.'));
     } finally {
       _fetching = false;
     }

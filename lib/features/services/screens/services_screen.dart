@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/router/app_routes.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/service_model.dart';
@@ -203,7 +204,8 @@ class _ServicesViewState extends ConsumerState<ServicesView> {
             ),
             loading: () => const _ServicesLoadingState(),
             error: (error, stackTrace) => _ServicesErrorState(
-              message: error.toString().replaceAll('Exception: ', ''),
+              message: userErrorMessage(error,
+                  fallback: 'Could not load services. Please try again.'),
               onRetry: () => ref.refresh(servicesProvider),
             ),
           ),

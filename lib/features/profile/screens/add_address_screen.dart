@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/services/geocoding_service.dart';
 import '../../../core/services/location_permission_service.dart';
@@ -202,7 +203,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     } catch (e, stackTrace) {
       debugPrint('[Location] save address failed: $e\n$stackTrace');
       setState(() => _saving = false);
-      _toast('Failed: ${e.toString().split('\n').first}');
+      _toast(userErrorMessage(e,
+          fallback: 'Could not save the address. Please try again.'));
     }
   }
 

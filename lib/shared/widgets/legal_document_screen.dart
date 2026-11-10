@@ -47,9 +47,18 @@ class LegalDocumentScreen extends StatelessWidget {
             return Markdown(
               data: snapshot.data!,
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-              onTapLink: (text, href, title) {
-                if (href == null) return;
-                launchUrl(Uri.parse(href), mode: LaunchMode.externalApplication);
+              onTapLink: (text, href, title) async {
+                final uri = href == null ? null : Uri.tryParse(href);
+                if (uri == null) return;
+                var opened = false;
+                try {
+                  opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } catch (_) {}
+                if (!opened && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Could not open the link. Please try again.'),
+                  ));
+                }
               },
               styleSheet: MarkdownStyleSheet(
                 h1: const TextStyle(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/user_error.dart';
 import '../models/pricing_data.dart';
 import '../models/cloth_type_model.dart';
 import '../providers/cloth_types_provider.dart';
@@ -333,7 +334,7 @@ class _ItemizedCategoryTab extends ConsumerWidget {
       },
       loading: () => const _PricingLoadingState(),
       error: (error, _) => _PricingErrorState(
-        message: error.toString().replaceAll('Exception: ', ''),
+        message: userErrorMessage(error, fallback: 'Could not load prices. Please try again.'),
         onRetry: () => ref.refresh(clothTypesProvider),
       ),
     );
@@ -452,7 +453,7 @@ class _WeightTieredCategoryTab extends ConsumerWidget {
       },
       loading: () => const _PricingLoadingState(),
       error: (error, _) => _PricingErrorState(
-        message: error.toString().replaceAll('Exception: ', ''),
+        message: userErrorMessage(error, fallback: 'Could not load prices. Please try again.'),
         onRetry: () => ref.refresh(clothTypesProvider),
       ),
     );
@@ -524,7 +525,7 @@ class _ShoeCleaningTab extends ConsumerWidget {
       },
       loading: () => const _PricingLoadingState(),
       error: (error, _) => _PricingErrorState(
-        message: error.toString().replaceAll('Exception: ', ''),
+        message: userErrorMessage(error, fallback: 'Could not load prices. Please try again.'),
         onRetry: () => ref.refresh(clothTypesProvider),
       ),
     );

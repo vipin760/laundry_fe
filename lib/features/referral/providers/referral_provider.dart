@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/user_error.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/referral_api.dart';
 import '../models/referral_models.dart';
@@ -135,7 +136,7 @@ class ReferralNotifier extends Notifier<ReferralState> {
 
   Future<void> refresh() => loadDashboard();
 
-  String _msg(Object e) => e.toString().replaceFirst('Exception: ', '');
+  String _msg(Object e) => userErrorMessage(e, fallback: kGenericErrorMessage);
 }
 
 /// Global provider for referral state.

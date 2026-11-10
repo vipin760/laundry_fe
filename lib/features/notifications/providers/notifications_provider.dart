@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/app_notification_model.dart';
@@ -87,7 +88,9 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
       state = state.copyWith(
           isLoading: false, error: msg ?? 'Could not load notifications.');
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+          isLoading: false,
+          error: userErrorMessage(e, fallback: 'Could not load notifications.'));
     }
   }
 

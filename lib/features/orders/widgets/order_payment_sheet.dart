@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/router/app_routes.dart';
 import '../../checkout/services/payment_service.dart';
 import '../../checkout/widgets/coupon_input_widget.dart';
@@ -76,10 +77,10 @@ class _OrderPaymentSheetState extends ConsumerState<OrderPaymentSheet> {
       Navigator.pop(context, PaySheetResult.walletSuccess);
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
       setState(() {
         _paying = false;
-        _payError = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+        _payError = userErrorMessage(e,
+            fallback: 'Could not pay from your wallet. Please try again.');
       });
     }
   }

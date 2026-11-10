@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/user_error.dart';
+import '../../../core/utils/share_origin.dart';
 import '../../checkout/services/payment_service.dart';
 import '../models/invoice_model.dart';
 import '../services/invoice_saver.dart';
@@ -43,16 +45,21 @@ class _InvoiceDownloadButtonState extends State<InvoiceDownloadButton> {
     });
   }
 
-  Future<void> _download() async {
+  Future<void> _download(BuildContext buttonContext) async {
     if (_metadata == null) return;
     setState(() { _downloading = true; _error = null; });
     try {
       final bytes = await _paymentService.downloadInvoiceBytes(orderId: widget.orderId);
-      await InvoiceSaver.save(bytes, '${_metadata!.invoiceNumber}.pdf');
+      if (!buttonContext.mounted) return;
+      await InvoiceSaver.save(
+        bytes,
+        '${_metadata!.invoiceNumber}.pdf',
+        shareOrigin: shareOriginFor(buttonContext),
+      );
     } catch (e) {
-      final msg = e.toString();
       if (mounted) {
-        setState(() => _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg);
+        setState(() => _error = userErrorMessage(e,
+            fallback: 'Could not download the invoice. Please try again.'));
       }
     } finally {
       if (mounted) setState(() => _downloading = false);
@@ -66,8 +73,8 @@ class _InvoiceDownloadButtonState extends State<InvoiceDownloadButton> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: _downloading ? null : _download,
+        Builder(builder: (buttonContext) => GestureDetector(
+          onTap: _downloading ? null : () => _download(buttonContext),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -91,7 +98,7 @@ class _InvoiceDownloadButtonState extends State<InvoiceDownloadButton> {
               ],
             ),
           ),
-        ),
+        )),
         if (_error != null) ...[
           const SizedBox(height: 6),
           Text(_error!, style: const TextStyle(fontSize: 12, color: _kRed)),

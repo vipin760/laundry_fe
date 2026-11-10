@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/utils/share_origin.dart';
 import '../../../core/widgets/app_text.dart';
 import '../../support/screens/terms_screen.dart';
 import '../../wallet/screens/wallet_screen.dart';
@@ -822,21 +823,30 @@ class _CodeCard extends StatelessWidget {
   final String code;
   final String link;
 
-  Future<void> _share() {
+  Future<void> _share(BuildContext buttonContext) {
     return Share.share(
       'Join me on LaundryBrew! Use my referral code $code to get a welcome '
       'bonus on your first order.\n$link',
       subject: 'LaundryBrew referral',
+      sharePositionOrigin: shareOriginFor(buttonContext),
     );
   }
 
-  Future<void> _shareOnWhatsApp() async {
+  Future<void> _shareOnWhatsApp(BuildContext context) async {
     final text = Uri.encodeComponent(
       'Join me on LaundryBrew! Use my referral code $code to get a welcome '
       'bonus on your first order.\n$link',
     );
     final uri = Uri.parse('https://wa.me/?text=$text');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not open WhatsApp. Please use "Share link" instead.'),
+      ));
+    }
   }
 
   void _copy(BuildContext context) {
@@ -923,8 +933,8 @@ class _CodeCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: GestureDetector(
-                  onTap: _share,
+                child: Builder(builder: (buttonContext) => GestureDetector(
+                  onTap: () => _share(buttonContext),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     decoration: BoxDecoration(color: _kPurple, borderRadius: BorderRadius.circular(12)),
@@ -937,12 +947,12 @@ class _CodeCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                ),
+                )),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  onTap: _shareOnWhatsApp,
+                  onTap: () => _shareOnWhatsApp(context),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     decoration: BoxDecoration(

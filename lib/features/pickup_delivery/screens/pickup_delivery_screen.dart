@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/router/app_routes.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../checkout/models/checkout_models.dart';
@@ -159,7 +160,8 @@ class _PickupDeliveryScreenState
                 child: CircularProgressIndicator(color: _kBlue),
               ),
               error: (err, _) => _ErrorView(
-                message: err.toString().replaceFirst('Exception: ', ''),
+                message: userErrorMessage(err,
+                    fallback: 'Could not load services. Please try again.'),
                 onRetry: () => ref.invalidate(servicesProvider),
               ),
               data: (services) => _isInstant

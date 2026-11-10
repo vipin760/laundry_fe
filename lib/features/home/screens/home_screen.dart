@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/notification_service.dart';
@@ -278,7 +279,8 @@ class _HomeTab extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2)),
             ),
             error: (err, _) => _ServicesErrorBanner(
-              message: err.toString().replaceFirst('Exception: ', ''),
+              message: userErrorMessage(err,
+                  fallback: 'Could not load services. Please try again.'),
               onRetry: () {
                 ref.invalidate(popularServicesProvider);
                 ref.invalidate(servicesProvider);

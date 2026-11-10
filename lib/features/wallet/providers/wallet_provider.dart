@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/wallet_transaction_model.dart';
@@ -63,7 +64,9 @@ class WalletNotifier extends Notifier<WalletState> {
         transactions: _parseTxns(data['transactions']),
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+          isLoading: false,
+          error: userErrorMessage(e, fallback: 'Could not load your wallet. Please try again.'));
     }
   }
 

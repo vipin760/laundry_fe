@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/user_error.dart';
 import '../data/account_deletion_api.dart';
 import '../models/delete_account_models.dart';
 
@@ -206,8 +207,13 @@ class DeleteAccountNotifier extends Notifier<DeleteAccountState> {
       final data = e.response?.data;
       if (data is Map) {
         final m = data['message'];
-        if (m is String && m.trim().isNotEmpty) return m.trim();
-        if (m is List && m.isNotEmpty) return m.map((x) => '$x').join('. ');
+        if (m is String && m.trim().isNotEmpty) {
+          return userErrorMessage(m, fallback: kGenericErrorMessage);
+        }
+        if (m is List && m.isNotEmpty) {
+          return userErrorMessage(m.map((x) => '$x').join('. '),
+              fallback: kGenericErrorMessage);
+        }
       }
       switch (e.response?.statusCode) {
         case 401:
@@ -227,7 +233,7 @@ class DeleteAccountNotifier extends Notifier<DeleteAccountState> {
           return 'Something went wrong. Please try again.';
       }
     }
-    return e.toString().replaceFirst('Exception: ', '');
+    return userErrorMessage(e, fallback: kGenericErrorMessage);
   }
 }
 

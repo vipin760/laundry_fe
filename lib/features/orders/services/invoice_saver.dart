@@ -1,3 +1,5 @@
+import 'dart:ui' show Rect;
+
 import 'invoice_saver_mobile.dart'
     if (dart.library.js_interop) 'invoice_saver_web.dart' as platform;
 
@@ -11,6 +13,8 @@ import 'invoice_saver_mobile.dart'
 /// went wrong" error. Web instead triggers a normal browser download via a
 /// Blob URL, since there's no filesystem or share sheet to use.
 class InvoiceSaver {
-  static Future<void> save(List<int> bytes, String filename) =>
-      platform.saveInvoice(bytes, filename);
+  /// [shareOrigin] anchors the iOS share sheet (see `shareOriginFor`); without
+  /// it iOS throws "sharePositionOrigin: argument must be set". Ignored on web.
+  static Future<void> save(List<int> bytes, String filename, {Rect? shareOrigin}) =>
+      platform.saveInvoice(bytes, filename, shareOrigin: shareOrigin);
 }

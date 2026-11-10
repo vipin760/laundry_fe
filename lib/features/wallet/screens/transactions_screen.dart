@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../models/wallet_transaction_model.dart';
 import '../providers/wallet_provider.dart';
 
@@ -53,7 +54,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         loading: () =>
             const Center(child: CircularProgressIndicator(color: _kBlue)),
         error: (e, _) => _ErrorView(
-            error: e.toString(),
+            error: userErrorMessage(e,
+                fallback: 'Could not load your transactions. Please try again.'),
             onRetry: () => ref.refresh(allTransactionsProvider)),
         data: (txns) {
           final filtered = _filter == 'all'

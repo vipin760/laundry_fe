@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/user_error.dart';
 import '../../../core/models/coupon_model.dart';
 import '../../../core/services/coupon_service.dart';
 
@@ -90,7 +91,8 @@ class _CouponInputWidgetState extends ConsumerState<CouponInputWidget> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          _error = userErrorMessage(e,
+              fallback: 'Could not apply this coupon. Please try again.');
           _isLoading = false;
         });
       }
