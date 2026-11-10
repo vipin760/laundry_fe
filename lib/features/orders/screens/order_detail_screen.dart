@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
 import '../../../core/realtime/order_realtime.dart';
@@ -162,7 +163,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
     if (!mounted) return;
     setState(() {
       _paying = false;
-      _payError = r.message ?? 'Payment failed. Please try again.';
+      _payError = paymentFailureMessage(r.code, r.message);
     });
   }
 
@@ -233,10 +234,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
     } catch (e) {
       if (_currentOrderId != null) await _paymentService.markPaymentFailed(_currentOrderId!);
       if (!mounted) return;
-      final msg = e.toString();
       setState(() {
         _paying = false;
-        _payError = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+        _payError = userErrorMessage(e, fallback: 'Payment failed. Please try again.');
       });
     }
   }
@@ -1159,10 +1159,10 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
       Navigator.pop(context, _PaySheetResult.walletSuccess);
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
       setState(() {
         _paying = false;
-        _payError = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+        _payError = userErrorMessage(e,
+            fallback: 'Could not pay from your wallet. Please try again.');
       });
     }
   }

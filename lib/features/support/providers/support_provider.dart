@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/support_models.dart';
@@ -93,7 +94,9 @@ class SupportNotifier extends Notifier<SupportState> {
         error: _extractError(error, 'Unable to load support chat.'),
       );
     } catch (error) {
-      state = state.copyWith(isLoading: false, error: error.toString());
+      state = state.copyWith(
+          isLoading: false,
+          error: userErrorMessage(error, fallback: 'Unable to load support chat.'));
     }
   }
 
@@ -119,7 +122,9 @@ class SupportNotifier extends Notifier<SupportState> {
         error: _extractError(error, 'Unable to send message.'),
       );
     } catch (error) {
-      state = state.copyWith(isSending: false, error: error.toString());
+      state = state.copyWith(
+          isSending: false,
+          error: userErrorMessage(error, fallback: 'Unable to send message.'));
     }
   }
 
@@ -386,11 +391,11 @@ class SupportNotifier extends Notifier<SupportState> {
     if (data is Map && data['message'] != null) {
       final message = data['message'];
       if (message is List) {
-        return message.join(', ');
+        return userErrorMessage(message.join(', '), fallback: fallback);
       }
-      return message.toString();
+      return userErrorMessage(message.toString(), fallback: fallback);
     }
-    return fallback;
+    return userErrorMessage(error, fallback: fallback);
   }
 }
 

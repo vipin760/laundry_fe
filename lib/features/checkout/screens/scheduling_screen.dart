@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../location/models/address_model.dart';
 import '../../location/providers/address_provider.dart';
 import '../../location/screens/checkout_address_screen.dart';
@@ -186,9 +187,8 @@ class _SchedulingScreenState extends ConsumerState<SchedulingScreen> {
         await _loadShopSlots();
       }
     } catch (e) {
-      final raw = e.toString();
-      setState(() => _optionsError =
-          raw.startsWith('Exception: ') ? raw.substring(11) : raw);
+      setState(() => _optionsError = userErrorMessage(e,
+          fallback: 'Could not load pickup options. Please try again.'));
     } finally {
       if (mounted) setState(() => _loadingOptions = false);
     }

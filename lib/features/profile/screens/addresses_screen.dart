@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../location/models/address_model.dart';
 import '../../location/providers/address_provider.dart';
 import '../../location/screens/add_edit_address_screen.dart';
@@ -129,7 +130,8 @@ class AddressesScreen extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Failed to delete: $e'),
+                content: Text(userErrorMessage(e,
+                    fallback: 'Could not delete the address. Please try again.')),
                 backgroundColor: Colors.red),
           );
         }

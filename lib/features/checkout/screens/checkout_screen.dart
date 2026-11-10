@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/utils/legal_links.dart';
 import '../../location/models/address_model.dart';
 import '../../orders/widgets/select_delivery_address_sheet.dart';
@@ -161,10 +162,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       Navigator.of(context).pop(_locationErrorMessage(e.code, e.message));
     } catch (e) {
       if (!mounted) return;
-      final raw = e.toString();
       setState(() {
         _isProcessing = false;
-        _error = raw.startsWith('Exception: ') ? raw.substring(11) : raw;
+        _error = userErrorMessage(e, fallback: 'Could not place your order. Please try again.');
       });
     }
   }

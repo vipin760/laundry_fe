@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/utils/share_origin.dart';
 import '../../../core/widgets/app_text.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../orders/models/order_model.dart';
@@ -603,12 +604,13 @@ class _PayNowSheetState extends ConsumerState<_PayNowSheet> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: Builder(builder: (buttonContext) => OutlinedButton.icon(
                     onPressed: () => Share.share(
-                        'Pay ₹$amount for Laundry Brew order #${widget.order.displayNumber}: $_link'),
+                        'Pay ₹$amount for Laundry Brew order #${widget.order.displayNumber}: $_link',
+                        sharePositionOrigin: shareOriginFor(buttonContext)),
                     icon: const Icon(Icons.share_rounded, size: 16),
                     label: const Text('Send link'),
-                  ),
+                  )),
                 ),
               ],
             ),

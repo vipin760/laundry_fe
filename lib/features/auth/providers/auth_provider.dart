@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/services/notification_service.dart';
 import '../models/auth_user.dart';
@@ -204,7 +205,7 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: userErrorMessage(e, fallback: kGenericErrorMessage));
       return false;
     }
   }
@@ -264,7 +265,7 @@ class AuthNotifier extends Notifier<AuthState> {
       );
     } catch (e) {
       debugPrint('[AUTH] Exception in verifyMobileOtp: $e');
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: userErrorMessage(e, fallback: kGenericErrorMessage));
     }
   }
 
@@ -300,7 +301,7 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: userErrorMessage(e, fallback: kGenericErrorMessage));
       return false;
     }
   }
@@ -336,7 +337,7 @@ class AuthNotifier extends Notifier<AuthState> {
         error: _extractErrorMessage(e, fallback: 'Failed to update profile. Please try again.'),
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: userErrorMessage(e, fallback: kGenericErrorMessage));
     }
   }
 
@@ -395,7 +396,7 @@ class AuthNotifier extends Notifier<AuthState> {
       );
     } catch (e) {
       debugPrint('[AUTH] Exception in _completeFirebaseLogin: $e');
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: userErrorMessage(e, fallback: kGenericErrorMessage));
     }
   }
 
@@ -523,24 +524,8 @@ class AuthNotifier extends Notifier<AuthState> {
     return null;
   }
 
-  String _extractErrorMessage(DioException error, {required String fallback}) {
-    final data = error.response?.data;
-    if (data is Map<String, dynamic>) {
-      final message = data['message'];
-      if (message is List) {
-        return message.join(', ');
-      }
-      if (message is String && message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (data is String && data.isNotEmpty) {
-      return data;
-    }
-
-    return fallback;
-  }
+  String _extractErrorMessage(DioException error, {required String fallback}) =>
+      userErrorMessage(error, fallback: fallback);
 
   String _extractFirebaseErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
@@ -556,8 +541,12 @@ class AuthNotifier extends Notifier<AuthState> {
         return 'This account has been disabled';
       case 'too-many-requests':
         return 'Too many requests. Please try again later.';
+      case 'network-request-failed':
+        return kNoInternetMessage;
+      case 'session-expired':
+        return 'OTP has expired. Please request a new one.';
       default:
-        return e.message ?? 'Authentication failed. Please try again.';
+        return userErrorMessage(e.message, fallback: 'Authentication failed. Please try again.');
     }
   }
 }

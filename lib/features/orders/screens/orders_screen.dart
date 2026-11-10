@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
@@ -479,7 +480,7 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
     if (!mounted) return;
     setState(() => _paying = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(r.message ?? 'Payment failed. Please try again.'),
+      content: Text(paymentFailureMessage(r.code, r.message)),
       backgroundColor: _kRed,
       behavior: SnackBarBehavior.floating,
     ));
@@ -543,10 +544,10 @@ class _ActiveOrderCardState extends ConsumerState<_ActiveOrderCard> {
       if (mounted) setState(() => _paying = false);
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
       setState(() => _paying = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg.startsWith('Exception: ') ? msg.substring(11) : msg),
+        content: Text(userErrorMessage(e,
+            fallback: 'Could not start the payment. Please try again.')),
         backgroundColor: _kRed,
         behavior: SnackBarBehavior.floating,
       ));

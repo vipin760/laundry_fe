@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
 import '../../orders/models/order_model.dart';
@@ -232,10 +233,9 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
     } catch (e) {
       await _svc.markPaymentFailed(widget.orderId);
       if (!mounted) return;
-      final msg = e.toString();
       setState(() {
         _paying = false;
-        _payError = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+        _payError = userErrorMessage(e, fallback: 'Payment failed. Please try again.');
       });
     }
   }
@@ -316,7 +316,8 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
       setState(() => _cancelling = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          content: Text(userErrorMessage(e,
+              fallback: 'Could not cancel the order. Please try again.')),
           backgroundColor: _kRed,
           duration: const Duration(seconds: 3),
         ),
@@ -331,7 +332,8 @@ class _TrackOrderScreenState extends ConsumerState<TrackOrderScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          _error = userErrorMessage(e,
+              fallback: 'Could not load your order. Please try again.');
           _loading = false;
         });
       }

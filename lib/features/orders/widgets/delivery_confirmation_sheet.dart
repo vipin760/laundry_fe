@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../checkout/models/checkout_models.dart' show DeliveryType;
 import '../../checkout/services/payment_service.dart';
 import '../../location/models/address_model.dart';
@@ -95,10 +96,10 @@ class _DeliveryConfirmationSheetState extends State<_DeliveryConfirmationSheet> 
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
       setState(() {
         _saving = false;
-        _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+        _error = userErrorMessage(e,
+            fallback: 'Could not update delivery details. Please try again.');
       });
     }
   }

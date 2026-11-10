@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/user_error.dart';
 import '../../../core/config/payment_config.dart';
 import '../../../core/payments/app_razorpay.dart';
 import '../../../features/auth/providers/auth_provider.dart';
@@ -103,7 +104,9 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        _showSnack('Could not initiate payment: $e', isError: true);
+        _showSnack(
+            userErrorMessage(e, fallback: 'Could not start the payment. Please try again.'),
+            isError: true);
       }
     }
   }
@@ -114,7 +117,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
     // server-side so the user can simply tap "Proceed to Pay" again.
     if (!mounted) return;
     setState(() => _loading = false);
-    _showSnack(r.message ?? 'Payment failed. Please try again.', isError: true);
+    _showSnack(paymentFailureMessage(r.code, r.message), isError: true);
   }
 
   void _onPaySuccess(PaymentSuccessResponse r) async {
