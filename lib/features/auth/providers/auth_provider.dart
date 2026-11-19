@@ -211,8 +211,10 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Verifies OTP. For new users, pass [name] so the backend can create the
-  /// account in a single step. On success, always navigates to HomeScreen.
-  Future<void> verifyMobileOtp(
+  /// account in a single step. Returns true once the user is signed in.
+  /// Navigation to Home is done by the router reacting to isAuthenticated,
+  /// and can complete (disposing the auth screen) before this returns.
+  Future<bool> verifyMobileOtp(
     String mobileNumber,
     String otp, {
     String? name,
@@ -233,7 +235,7 @@ class AuthNotifier extends Notifier<AuthState> {
           isLoading: false,
           error: 'OTP session expired. Please request a new OTP.',
         );
-        return;
+        return false;
       }
 
       final credential = PhoneAuthProvider.credential(
@@ -251,21 +253,24 @@ class AuthNotifier extends Notifier<AuthState> {
           isLoading: false,
           error: 'Failed to get authentication token.',
         );
-        return;
+        return false;
       }
 
       // Complete login with backend
       debugPrint('[AUTH] Calling _completeFirebaseLogin()');
       await _completeFirebaseLogin(idToken, normalizedMobile, name);
+      return state.isAuthenticated;
     } on FirebaseAuthException catch (e) {
       debugPrint('[AUTH] FirebaseAuthException: ${e.code} - ${e.message}');
       state = state.copyWith(
         isLoading: false,
         error: _extractFirebaseErrorMessage(e),
       );
+      return false;
     } catch (e) {
       debugPrint('[AUTH] Exception in verifyMobileOtp: $e');
       state = state.copyWith(isLoading: false, error: userErrorMessage(e, fallback: kGenericErrorMessage));
+      return false;
     }
   }
 

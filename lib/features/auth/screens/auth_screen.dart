@@ -142,46 +142,54 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
 
     // ✅ PHASE 2: Verify OTP and create account
-    final name = authState.isNewUser ? _nameController.text.trim() : null;
-    await ref
+    final isNewUser = authState.isNewUser;
+    final name = isNewUser ? _nameController.text.trim() : null;
+    // Captured BEFORE the await: on success the router navigates to Home and
+    // disposes this screen while verifyMobileOtp() is still finishing (it
+    // awaits the notification-permission prompt and FCM registration), after
+    // which `context`, `ref` and the text controllers are unusable. The root
+    // ScaffoldMessenger outlives this route, so snackbars still show on Home.
+    final referralCode = _referralCodeController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+
+    final signedIn = await ref
         .read(authProvider.notifier)
         .verifyMobileOtp(mobileNumber, _otpValue.trim(), name: name);
 
-    if (!mounted) return;
+    // Verification failed: the error banner on this screen already says why.
+    // Never call the authenticated referral API without a session.
+    if (!signedIn) return;
 
     // ✅ PHASE 3: Handle referral code for new users ONLY.
     // Uses the shared authenticated ApiClient (POST /referral/apply).
     // Referral codes for the new user themselves are generated server-side
     // at registration — no client call needed.
-    if (authState.isNewUser && _referralCodeController.text.isNotEmpty) {
+    // Deliberately NOT gated on `mounted` — see the comment above.
+    if (isNewUser && referralCode.isNotEmpty) {
       try {
-        await const ReferralApi().apply(_referralCodeController.text.trim());
+        await const ReferralApi().apply(referralCode);
         debugPrint('✓ Referral code applied');
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '✓ Referral applied! Rewards unlock after your first order.',
-              ),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              '✓ Referral applied! Rewards unlock after your first order.',
             ),
-          );
-        }
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
       } catch (e) {
         debugPrint('⚠️ Referral error: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Referral code could not be applied: ${_referralErrorMessage(e)}',
-              ),
-              backgroundColor: Colors.orange.shade800,
-              duration: const Duration(seconds: 4),
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Referral code could not be applied: ${_referralErrorMessage(e)}',
             ),
-          );
-        }
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }

@@ -63,7 +63,7 @@ GoRouter _buildRouter(Ref ref) {
   final notifier = _AuthChangeNotifier(ref);
   ref.onDispose(notifier.dispose);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: kDebugMode,
     refreshListenable: notifier,
@@ -360,6 +360,47 @@ GoRouter _buildRouter(Ref ref) {
       ),
     ],
   );
+
+  _leavePushedAuthRouteOnSignIn(ref, router);
+  return router;
+}
+
+// Leaves a *pushed* auth screen once the user signs in.
+//
+// Since guest browsing (App Store 5.1.1(v)), guests reach login via
+// `context.push(AppRoutes.login)` on top of /home. `redirect` above can't
+// handle that case: go_router keeps the base stack's location (/home) as
+// `matchedLocation` for a pushed route, and it ignores a redirect to the
+// location it is already on — so a successful login left the user on the
+// login screen, reset to "Send OTP". Here we navigate explicitly instead.
+//
+// Deliberately narrow: only acts when an auth route is pushed over a non-auth
+// base location. When login *is* the base location (e.g. a guest bounced
+// from a protected route), `redirect` already handles it, unchanged.
+// `go` (not `pop`) so delivery partners still land on their own home, and so
+// this navigation supersedes the refresh-triggered redirect regardless of
+// listener order. Pages opened with Navigator.push on top of Home (e.g.
+// Pickup & Delivery) survive this, so the user returns to where they were.
+void _leavePushedAuthRouteOnSignIn(Ref ref, GoRouter router) {
+  ref.listen<AuthState>(authProvider, (prev, next) {
+    final justSignedIn =
+        !(prev?.isAuthenticated ?? false) && next.isAuthenticated;
+    if (!justSignedIn) return;
+
+    final config = router.routerDelegate.currentConfiguration;
+    if (config.isEmpty) return;
+    final topLoc = config.last.matchedLocation; // screen actually showing
+    final baseLoc = config.uri.path; // what `redirect` sees
+    final isPushedAuthRoute =
+        topLoc.startsWith('/auth') && !baseLoc.startsWith('/auth');
+    if (!isPushedAuthRoute) return;
+
+    final isPartner = next.user?.isDeliveryPartner ?? false;
+    final target =
+        isPartner ? AppRoutes.deliveryPartnerHome : AppRoutes.home;
+    debugPrint('[ROUTER] Signed in on pushed $topLoc - going to $target');
+    router.go(target);
+  });
 }
 
 // Bridges Riverpod authProvider → ChangeNotifier so GoRouter's
