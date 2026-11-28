@@ -16,6 +16,7 @@ import '../../services/models/service_model.dart';
 import '../../services/providers/cart_provider.dart';
 import '../../services/providers/services_provider.dart';
 import '../providers/standard_slots_provider.dart';
+import '../widgets/pickup_service_card.dart';
 
 // ── Brand colours ─────────────────────────────────────────────────────────────
 const _kBlue   = Color(0xFF2453FF);
@@ -757,192 +758,22 @@ class _ServiceRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final qty     = ref.watch(cartProvider).quantityFor(service.id, category);
     final pending = ref.watch(cartProvider).isPending(service.id, category);
-    final hasImage = service.imageUrl != null && service.imageUrl!.isNotEmpty;
+    final serviceCategory = ServiceCategory.fromValue(category);
+    final description = service.descriptionFor(serviceCategory);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: qty > 0 ? const Color(0xFFF0F1FF) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: qty > 0 ? _kBlue : const Color(0xFFE9EDFA),
-          width: qty > 0 ? 1.5 : 1.0,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // ── Service image ────────────────────────────────────────────────
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(13),
-              bottomLeft: Radius.circular(13),
-            ),
-            child: SizedBox(
-              width: 80,
-              height: 80,
-              child: hasImage
-                  ? Image.network(
-                      service.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _FallbackIcon(
-                        icon: _iconFor(service.name),
-                        selected: qty > 0,
-                      ),
-                    )
-                  : _FallbackIcon(
-                      icon: _iconFor(service.name),
-                      selected: qty > 0,
-                    ),
-            ),
-          ),
-
-          // ── Name + details ──────────────────────────────────────────────
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0A1645),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    service.descriptionFor(ServiceCategory.fromValue(category)).isNotEmpty
-                        ? service.descriptionFor(ServiceCategory.fromValue(category))
-                        : (service.durationFor(ServiceCategory.fromValue(category)) ?? ''),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9CA3AF),
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // ── Add / Remove control ────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: pending
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _kBlue,
-                    ),
-                  )
-                : qty == 0
-                    ? _AddButton(
-                        onTap: () =>
-                            handleAddToCart(context, ref, service, category),
-                      )
-                    : _RemoveButton(
-                        onTap: () => ref
-                            .read(cartProvider.notifier)
-                            .decrementOrRemove(service.id, category),
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Fallback icon when no image ───────────────────────────────────────────────
-
-class _FallbackIcon extends StatelessWidget {
-  const _FallbackIcon({required this.icon, required this.selected});
-  final IconData icon;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: selected ? _kBlue.withAlpha(28) : const Color(0xFFEEF0FF),
-      child: Center(
-        child: Icon(icon, color: _kBlue, size: 28),
-      ),
-    );
-  }
-}
-
-// ── ADD button ────────────────────────────────────────────────────────────────
-
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: _kBlue,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Text(
-          'ADD',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Remove button (shown when service is in cart) ─────────────────────────────
-
-class _RemoveButton extends StatelessWidget {
-  const _RemoveButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE53E3E), width: 1.5),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_rounded,
-                size: 14, color: Color(0xFF15803D)),
-            SizedBox(width: 4),
-            Text(
-              'REMOVE',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFFE53E3E),
-                letterSpacing: 0.3,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return PickupServiceCard(
+      name: service.name,
+      description: description.isNotEmpty
+          ? description
+          : (service.durationFor(serviceCategory) ?? ''),
+      imageUrl: service.imageUrl,
+      fallbackIcon: _iconFor(service.name),
+      selected: qty > 0,
+      pending: pending,
+      onAdd: () => handleAddToCart(context, ref, service, category),
+      onRemove: () => ref
+          .read(cartProvider.notifier)
+          .decrementOrRemove(service.id, category),
     );
   }
 }
